@@ -21,10 +21,10 @@ from stuned.utility.utils import AttrDict
 # local imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 sys.path.insert(0, (os.path.dirname(os.path.dirname(__file__)))) # to allow importing from get_segments directly
-from densifier.get_segments.utils import add_maskformer2_config
-import densifier.get_segments.cropformer_model
-from densifier.get_segments.tardataset import TarDataset
-from densifier.get_segments.utils import BatchResizeShortestEdge, EntityCrop, EntityCropTransform
+from occam.get_segments.utils import add_maskformer2_config
+# import occam.get_segments.cropformer_model
+from occam.get_segments.tardataset import TarDataset
+from occam.get_segments.utils import BatchResizeShortestEdge, EntityCrop, EntityCropTransform
 sys.path.pop(0)
 sys.path.pop(0)
 
@@ -43,6 +43,12 @@ class EntityNetV2(DefaultPredictor):
             parallel (bool): whether to run the model in different processes from visualization.
                 Useful since the visualization logic can be slow.
         """
+        # register architecture
+        # requires compiling MultiScaleDeformableAttention CUDA op with the following commands:
+        # cd occam/get_segments/modeling/pixel_decoder/ops
+        # sh make.sh
+        import occam.get_segments.cropformer_model
+
         cfg = get_cfg()
         add_deeplab_config(cfg)
         add_maskformer2_config(cfg)

@@ -6,7 +6,7 @@
     "configurations": [
 
         {
-            "name": "Python predict_masks.py",
+            "name": "Python predict_masks.py dino-ft",
             "type": "debugpy",
             "request": "launch",
             "program": "./scripts/predict_masks.py",
@@ -19,13 +19,39 @@
                 "./data/datasets/ImageNet-D/background",
                 "--output",
                 "./data/masks/Dino_FT/IN_D_background_masks_dino_ft_debug.pkl",
+                "--mask_generator_type",
+                "dino-ft",
+                "--num_slots",
+                "5"
             ]
         },
         {
-            "name": "Python download_datasets.py",
+            "name": "Python predict_masks.py cropformer",
             "type": "debugpy",
             "request": "launch",
-            "program": "./scripts/download_datasets.py",
+            "program": "./scripts/predict_masks.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--input_folder",
+                "./data/datasets/ImageNet-D/background",
+                "--output",
+                "./data/masks/Cropformer/IN_D_background_masks_cropformer_debug.pkl",
+                "--mask_generator_type",
+                "cropformer",
+                "--model_path",
+                "./checkpoints/CropFormer_hornet_3x_03823a.pth",
+                "--confidence-threshold",
+                "0.5",
+                "--config_file",
+                "./configs/cropformer_hornet.yaml"
+            ]
+        },
+        {
+            "name": "Python download_datasets_and_checkpoints.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "./scripts/download_datasets_and_checkpoints.py",
             "console": "integratedTerminal",
             "justMyCode": true,
         },

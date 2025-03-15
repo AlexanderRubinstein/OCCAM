@@ -29,7 +29,8 @@ sys.path.insert(
         get_project_root_path(), "src"
     )
 )
-import densifier
+# import densifier
+import occam
 # from densifier.datasets.imagenet_classes import get_in_classes_prompts
 # from densifier.utility.utils_for_notebooks import (
 #     visualize_images_side_by_side,

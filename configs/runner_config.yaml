@@ -6,7 +6,7 @@ exec_path: <p>
 conda_env: ./envs/occam
 
 kwargs:
-  "model_id": dinosaur_base_patch14_518_topk3.coco_dv2_ft_s7_300k+10k
+  "model_id": <p>
   "input_folder": <p>
   "output": <p>
 

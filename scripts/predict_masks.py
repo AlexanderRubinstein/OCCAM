@@ -14,7 +14,7 @@ from torchvision.datasets import ImageFolder
 
 
 # local imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from occam.submodules.dino_ft_wrapper import (
     load_model,
     get_masks_as_image
@@ -41,22 +41,37 @@ TAR_FOLDER = os.path.join(
 def get_parser():
     parser = argparse.ArgumentParser(description="Predict masks with Dino-FT")
     parser.add_argument("--model_id", help="Dino-FT model id")
+    parser.add_argument("--model_path", help="Cropformer checkpoint path")
     parser.add_argument("--input_folder", help="Input folder")
-    parser.add_argument("--num_slots", help="Number of slots", type=int, default=5)
+    parser.add_argument("--num_slots", help="Number of slots", type=int)
     parser.add_argument("--output", help="Output file")
-    # parser.add_argument("--batch_size", help="Batch size", type=int, default=1)
     parser.add_argument("--num_workers", help="Number of workers", type=int, default=12)
-    parser.add_argument("--mask_generator_type", help="Mask generator type", type=str, choices=["dino-ft", "cropformer"])
-    parser.add_argument("--range", help="Range of images to process", default=None)
-    # parser.add_argument("--output", help="A directory to save output predictions dump.")
-    parser.add_argument("--confidence-threshold",type=float,default=0.5,help="Minimum score for instance predictions to be shown")
     parser.add_argument(
-        "--opts",
-        help="Modify config options using the command-line 'KEY VALUE' pairs",
-        default=[],
-        nargs=argparse.REMAINDER
+        "--mask_generator_type",
+        help="Mask generator type",
+        type=str,
+        choices=["dino-ft", "cropformer"]
+    )
+    parser.add_argument("--range", help="Range of images to process", default=None)
+    parser.add_argument(
+        "--confidence-threshold",
+        type=float,
+        default=None,
+        help="Minimum score for instance predictions of CropFormer to be shown"
+    )
+    parser.add_argument(
+        "--config_file",
+        help="path to config file"
     )
     return parser
+
+
+def should_be_none(arg, arg_name, mask_generator_type):
+    assert arg is None, f"{arg_name} should be None for {mask_generator_type}"
+
+
+def should_be_provided(arg, arg_name, mask_generator_type):
+    assert arg is not None, f"{arg_name} should be provided for {mask_generator_type}"
 
 
 def pop_arg_from_opts(args, arg_name):
@@ -78,42 +93,34 @@ if __name__ == "__main__":
     optionally_make_dir(args.output)
 
     if args.mask_generator_type == "cropformer":
-        assert args.num_slots is None, "num_slots should be None for cropformer"
-        if args.output is None:
-            args.output = pop_arg_from_opts(args, "--output")
 
-        if args.range is None:
-            args.range = pop_arg_from_opts(args, "--range")
-        elif args.range == "None":
+        should_be_provided(args.config_file, "config_file", "cropformer")
+        should_be_provided(args.model_path, "model_path", "cropformer")
+        should_be_provided(args.confidence_threshold, "confidence_threshold", "cropformer")
+
+        should_be_none(args.model_id, "model_id", "cropformer")
+        should_be_none(args.num_slots, "num_slots", "cropformer")
+
+        args.opts = ("MODEL.WEIGHTS " + args.model_path).split()
+        if args.range == "None":
             args.range = None
 
-        print("Arguments: " + str(args))
-
-        # Load Dataset
-        # tar folder
-        # e.g. .../cache/ImageNet1k/val_tar/tar_in_val.tar.gz
-        # if not os exits ...
-
         # CropFormer requires a tar dataset
-        tar_path = os.path.join(TAR_FOLDER, os.path.basename(args.input_folder) + ".tar.gz")
+        tar_path = os.path.join(
+            TAR_FOLDER,
+            os.path.basename(args.input_folder) + ".tar.gz"
+        )
 
         if not os.path.exists(tar_path):
+            print(f"Tar file {tar_path} does not exist, creating it...")
             optionally_make_dir(tar_path)
             create_tar_from_folder(tar_path, args.input_folder)
-        # os.system(f"tar -hczf {tar_path} {target_folder}")
+
         input_path = tar_path
 
-        # if input_path.endswith('.tar') or input_path.endswith('.tar.gz'):
-        #     dataset = TarDataset(input_path, transform=None)
-        # else:
-        #     dataset = ImageFolder(input_path, transform=None)
         if args.range is None:
             images_range = None
         else:
-            # assert ":" == args.range[0]
-            # assert ":" == args.range[1]
-            # args.range = args.range[1:-1]
-            # images_range = parse_list_from_string(args.range, list_separators=":")
             start, end = args.range.split(':')
             images_range = [int(start), int(end)]
 
@@ -122,15 +129,21 @@ if __name__ == "__main__":
         output = net.run(range=images_range)
 
         # Save Segments
-        # os.makedirs(os.path.dirname(args.output), exist_ok=True)
         pickle.dump(output, open(args.output, 'wb'))
 
     elif args.mask_generator_type == "dino-ft":
 
-        assert args.range is None, "range is not implemented for dino-ft"
-        assert args.opts is None, "opts should be None for dino-ft"
+        should_be_provided(args.model_id, "model_id", "dino-ft")
+        should_be_provided(args.num_slots, "num_slots", "dino-ft")
+
+        should_be_none(args.config_file, "config_file", "dino-ft")
+        should_be_none(args.model_path, "model_path", "dino-ft")
+        should_be_none(args.range, "range", "dino-ft")
+        should_be_none(args.confidence_threshold, "confidence_threshold", "dino-ft")
         assert args.confidence_threshold is None, \
             "confidence_threshold is not implemented for dino-ft"
+
+        assert len(args.opts) == 0, "opts should be empty for dino-ft"
 
         model = load_model(args.model_id)
         preproc = build_dinosaur.build_preprocessing(args.model_id)
@@ -163,8 +176,6 @@ if __name__ == "__main__":
             image = Image.open(image_path) # needed for height and width
 
             with torch.no_grad():
-                # inp = preproc(image).unsqueeze(0)
-                # inp = sample.unsqueeze(0)
                 inp = sample.to(device)
                 outp = model(inp, num_slots=args.num_slots)
                 masks_as_image = get_masks_as_image(
@@ -175,8 +186,6 @@ if __name__ == "__main__":
                 mask_id = image_path[1:] # legacy
                 masks_to_pickle[mask_id] = {
                     "mask": masks_as_image.cpu().numpy().astype(np.uint8),
-                    # "scores": None
                 }
         assert len(masks_to_pickle) == len(dl)
-        # optionally_make_dir(args.output)
         pickle.dump(masks_to_pickle, open(args.output, "wb"))
