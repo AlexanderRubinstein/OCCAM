@@ -1,0 +1,6 @@
+# python==3.10
+git+https://github.com/AlexanderRubinstein/STAI-tuned.git
+git+https://github.com/facebookresearch/detectron2.git
+./occam/submodules/dino_ft
+./occam/submodules/alpha_clip
+./occam/submodules/oclf

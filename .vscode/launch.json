@@ -1,0 +1,25 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "Python predict_masks.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "./occam/predict_masks/predict_masks.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--model_id",
+                "dinosaur_base_patch14_518_topk3.coco_dv2_ft_s7_300k+10k",
+                "--input_folder",
+                "./data/datasets/UrbanCars/test/",
+                "--output",
+                "./data/masks/Dino_FT/UrbanCars_test_masks_dino_ft_debug.pkl",
+            ]
+        },
+    ]
+}

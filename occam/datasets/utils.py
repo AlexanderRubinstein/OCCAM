@@ -1,0 +1,406 @@
+import sys
+import os
+import torch
+import wandb
+import numpy as np
+from PIL import Image
+from typing import Any
+from torchvision.datasets import ImageFolder
+import torchvision
+
+
+from stuned.utility.utils import (
+    get_project_root_path,
+    get_with_assert,
+    raise_unknown,
+    str_is_number
+)
+from stuned.local_datasets.imagenet1k import (
+    DEFAULT_MEAN,
+    DEFAULT_STD,
+    get_imagenet_dataloaders
+)
+
+
+# local modules
+sys.path.insert(
+    0,
+    os.path.join(
+        get_project_root_path(), "src"
+    )
+)
+import densifier
+# from densifier.datasets.imagenet_classes import get_in_classes_prompts
+# from densifier.utility.utils_for_notebooks import (
+#     visualize_images_side_by_side,
+#     tensor_for_matplotlib,
+#     unnormalize,
+#     load_data
+# )
+# from densifier.datasets.bboxed_dataset import (
+#     get_bboxed_dataloaders
+# )
+sys.path.pop(0)
+
+
+IMAGE_NORMALIZATION_CONST = 255
+JSON_PATH = os.path.join(
+    get_project_root_path(),
+    "json"
+)
+
+
+def open_pil_image(image_path):
+    return np.array(Image.open(image_path).convert('RGB')) / IMAGE_NORMALIZATION_CONST
+
+
+def make_wandb_image(tensor, caption=None):
+    return wandb.Image(
+        unnormalize(
+            tensor,
+            (0.5, 0.5, 0.5),
+            (0.5, 0.5, 0.5)
+        ).squeeze(0).permute(1, 2, 0).cpu().numpy(),
+        caption=caption
+    )
+
+
+# function is taken from: https://github.com/bethgelab/model-vs-human/blob/master/modelvshuman/models/pytorch/simclr/utils/modules.py#L21
+def unnormalize(tensor, mean=[0], std=[1], inplace=False):
+    """Unnormalize a tensor image by first multiplying by std (channel-wise) and then adding the mean (channel-wise)
+
+    Args:
+        tensor (Tensor): Tensor image of size (N, C, H, W) to be de-standarized.
+        mean (sequence): Sequence of original means for each channel.
+        std (sequence): Sequence of original standard deviations for each channel.
+        inplace(bool,optional): Bool to make this operation inplace.
+
+    Returns:
+        Tensor: Unnormalized Tensor image.
+
+    """
+
+    if not torch.is_tensor(tensor):
+        raise TypeError('tensor should be a torch tensor. Got {}.'.format(type(tensor)))
+
+    if tensor.ndimension() != 4:
+        raise ValueError('Expected tensor to be a tensor image of size (N, C, H, W). Got tensor.size() = '
+                         '{}.'.format(tensor.size()))
+    if not inplace:
+        tensor=tensor.clone()
+
+    dtype = tensor.dtype
+    mean = torch.as_tensor(mean, dtype=dtype, device=tensor.device)
+    std = torch.as_tensor(std, dtype=dtype, device=tensor.device)
+
+    if (std == 0).any():
+        raise ValueError('std evaluated to zero after conversion to {}, leading to division by zero.'.format(dtype))
+
+    if mean.ndim == 1:
+        mean = mean[None, :, None, None]
+    if std.ndim == 1:
+        std = std[None, :, None, None]
+
+    tensor.mul_(std).add_(mean)
+    return tensor
+
+
+def unnormalize_in1k(image):
+    return unnormalize(
+        image,
+        DEFAULT_MEAN,
+        DEFAULT_STD
+    )
+
+
+def torch_max_func(tensor, axis):
+    return torch.max(tensor, axis=axis).values
+
+
+# based on https://github.com/bethgelab/model-vs-human/blob/master/modelvshuman/datasets/decision_mappings.py
+class ToClassesMapping:
+
+    def __init__(self, indices_for_category, aggregation_function=torch.mean):
+
+        self.aggregation_function = aggregation_function
+        self.indices_for_category = indices_for_category
+        self.categories = self.indices_for_category.categories
+
+    def check_input(self, probabilities):
+        assert (probabilities >= 0.0).all() and (probabilities <= 1.0).all()
+
+    def __call__(self, probabilities):
+        """
+        probabilities: (batch_size, num_classes)
+        returns: (batch_size, num_categories)
+        """
+
+        aggregated_class_probabilities = []
+
+        for category in self.categories:
+            indices = self.indices_for_category(category)
+            values = probabilities[:, indices]
+            aggregated_value = self.aggregation_function(values, axis=-1)
+            aggregated_class_probabilities.append(aggregated_value.unsqueeze(1))
+
+        aggregated_class_probabilities = torch.cat(
+            aggregated_class_probabilities,
+            dim=1
+        )
+
+        return aggregated_class_probabilities
+
+
+def make_to_classes_mapping(indices_for_category, aggregation_function=torch.mean):
+    return ToClassesMapping(indices_for_category, aggregation_function)
+
+
+# ??
+# # TODO(Alex | 17.01.2024): make this non-experimental
+# # by directly accessing methods like "to" and "eval" from inner_object
+# # maybe don't even need to inherit from torch.nn.Module,
+# # just return isinstance of inner_object?
+# class ModuleDelegatingWrapper(torch.nn.Module):
+
+#     def __init__(self, inner_object):
+#         super().__init__()
+
+#         object.__setattr__(self, CUSTOM_ATTRS_KEY, {})
+#         attrs = self.get_custom_attrs()
+#         attrs[INNER_OBJECT_KEY] = inner_object
+
+#     def __getattr__(self, name):
+
+#         inner_object = self.get_inner_object()
+#         object.__getattribute__(inner_object, name)
+
+#     def get_inner_object(self):
+#         attrs = self.get_custom_attrs()
+#         return attrs[INNER_OBJECT_KEY]
+
+#     def get_custom_attrs(self):
+#         return object.__getattribute__(self, CUSTOM_ATTRS_KEY)
+
+#     def __setattr__(self, key, value):
+
+#         inner_object = self.get_inner_object()
+#         setattr(inner_object, key, value)
+
+#     def to(self, *args):
+#         inner_object = self.get_inner_object()
+#         inner_object.to(*args)
+
+#     def train(self, *args):
+#         inner_object = self.get_inner_object()
+#         inner_object.train(*args)
+
+#     def eval(self, *args):
+#         inner_object = self.get_inner_object()
+#         inner_object.eval(*args)
+
+
+class ModuleDelegatingWrapper(torch.nn.Module):
+    def __init__(self, inner_module: torch.nn.Module):
+        """
+        A wrapper around torch.nn.Module to delegate calls to an inner module.
+
+        Args:
+            inner_module (torch.nn.Module): The module to wrap.
+        """
+        super().__init__()
+        self.inner_module = inner_module
+
+    def forward(self, *args, **kwargs) -> Any:
+        """
+        Delegates the forward pass to the inner module.
+        """
+        return self.inner_module(*args, **kwargs)
+
+    def __getattr__(self, name: str) -> Any:
+        """
+        Delegate attribute access to the inner module unless the attribute exists in this wrapper.
+        """
+        if name != "inner_module" and hasattr(self.inner_module, name):
+            return getattr(self.inner_module, name)
+        return super().__getattr__(name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """
+        Delegate attribute setting to the inner module unless setting the 'inner_module' or wrapper attributes.
+        """
+        if name != "inner_module" and hasattr(self.inner_module, name):
+            setattr(self.inner_module, name, value)
+        else:
+            super().__setattr__(name, value)
+
+    def __call__(self, *args, **kwargs) -> Any:
+        """
+        Delegate the call to the inner module.
+        """
+        return self.inner_module(*args, **kwargs)
+
+
+def make_model_classes_wrapper(model, make_mapper):
+    return ModelClassesWrapper(model, make_mapper)
+
+
+class ModelClassesWrapper(ModuleDelegatingWrapper):
+
+    def __init__(self, model, make_mapper):
+        super().__init__(model)
+        self.mapper = make_mapper()
+        # self.softmax = torch.nn.Softmax(dim=-1)
+        # attrs = self.get_custom_attrs()
+        # attrs["softmax"] = torch.nn.Softmax(dim=-1)
+        # attrs["mapper"] = make_mapper()
+
+    def __call__(self, x):
+        # attrs = self.get_custom_attrs()
+        # underlying_model = self.get_inner_object()
+        # softmax = attrs["softmax"]
+        # mapper = attrs["mapper"]
+
+        logits = self.inner_module(x)
+        # probs = self.softmax(logits)
+
+        # TODO(Alex | 19.12.2024): make sure that applying mapper to logits instead of probs does not ??
+        return self.mapper(logits)
+
+
+def get_collate_fn_in_d(drop_paths):
+    def collate_fn_in_d(examples):
+        images = []
+        labels = []
+        paths = []
+        for example in examples:
+            images.append(example["images"])
+            # we take only first label as we are not interested in top-5 accuracy
+            labels.append(torch.tensor(example["labels"][0], dtype=torch.long))
+            paths.append(example["path"])
+        if drop_paths:
+            return torch.stack(images), torch.stack(labels)
+        else:
+            return torch.stack(images), torch.stack(labels), paths
+
+    return collate_fn_in_d
+
+
+def make_custom_folder_path2label(dataset_path):
+    # dataset_path = "/home/oh/arubinstein17/github/densification/data/CounterAnimal/symlinked/counter"
+    transform = None
+    return_path = True
+    masks = None
+    mask_transform = None
+
+    dataset = CustomImageFolder(
+        dataset_path,
+        transform=transform,
+        return_path=return_path,
+        masks=masks,
+        mask_transform=mask_transform
+    )
+
+    # res = []
+    # for item in tqdm(dataset):
+    #     res.append([item[2], item[1]])
+    # return res
+    return dataset.samples
+
+
+class CustomImageFolder(ImageFolder):
+
+    def __init__(
+        self,
+        root,
+        return_path=False,
+        masks=None,
+        mask_transform=None,
+        **kwargs
+    ):
+        super().__init__(root, **kwargs)
+        self.masks = masks
+        self.return_path = return_path
+        self.mask_transform = mask_transform
+        if self.transform is not None and self.mask_transform is not None:
+            resize_from_image = self.transform.transforms[0]
+            resize_from_mask = self.mask_transform.transforms[1]
+            assert isinstance(resize_from_image, torchvision.transforms.Resize)
+            assert isinstance(resize_from_mask, torchvision.transforms.Resize)
+            if isinstance(resize_from_image.size, tuple):
+                assert resize_from_image.size[0] == resize_from_image.size[1]
+                assert resize_from_mask.size[0] == resize_from_mask.size[1]
+                resize_from_mask = resize_from_image
+            else:
+                resize_from_image_size = resize_from_image.size
+            # assert resize_from_image_size == resize_from_mask.size, \
+            #     f"Resize sizes should be the same: {resize_from_image.size} vs {resize_from_mask.size}"
+            # assert resize_from_image.interpolation == resize_from_mask.interpolation, \
+            #     "Resize interpolations should be the same"
+
+    def __getitem__(self, index: int):
+
+        path, target = self.samples[index]
+        sample = self.loader(path)
+        if self.transform is not None:
+            sample = self.transform(sample)
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        return_value = [sample, target]
+
+        if self.masks is not None:
+
+            image_name = os.path.basename(path)
+            image_class = os.path.basename(os.path.dirname(path))
+            image_type = os.path.basename(os.path.dirname(os.path.dirname(path)))
+            mask_id = f"{image_type}_{image_class}_{image_name}"
+
+            mask = self.masks[mask_id]['mask']
+            if self.mask_transform is not None:
+                mask = self.mask_transform(mask)
+                # mask = einops.repeat(mask, 'b c h w -> b (repeat c) h w', repeat=3)
+                assert len(mask.shape) == 3
+                mask = mask.repeat(3, 1, 1)
+            return_value.append(mask)
+
+        if self.return_path:
+            return_value.append(path)
+
+        return return_value
+
+    def find_classes(self, dir):
+        classes = os.listdir(dir)
+        class_to_idx = {}
+        for i, class_name in enumerate(sorted(classes)):
+            if str_is_number(class_name):
+                class_id = int(class_name)
+            else:
+                class_id = i
+            class_to_idx[class_name] = class_id
+        # class_to_idx = {class_name: int(class_name) for class_name in classes}
+        return classes, class_to_idx
+
+
+def make_custom_folder_dataloader(
+    dataset_path,
+    transform,
+    batch_size=128,
+    num_workers=4,
+    return_path=False,
+    masks=None,
+    mask_transform=None
+):
+    if mask_transform is not None:
+        assert masks is not None
+    dataset = CustomImageFolder(
+        dataset_path,
+        transform=transform,
+        return_path=return_path,
+        masks=masks,
+        mask_transform=mask_transform
+    )
+    return torch.utils.data.DataLoader(
+        dataset,
+        batch_size=batch_size,
+        num_workers=num_workers
+    )

@@ -1,0 +1,3 @@
+path_to_main,path_to_default_config,whether_to_run,delta:exec_path,delta:kwargs/range,delta:kwargs/input_folder,delta:kwargs/input,delta:kwargs/output,status,run_folder,stdout,stderr,walltime
+,,,,,,,,,,,,
+__RUNNER__,./configs/runner_config.yaml,1,./scripts/predict_masks.py,DEFAULT,./data/UrbanCars/test,DEFAULT,./data/masks/Dino_FT/UrbanCars_test_masks_dinoft.pkl,,,,,
