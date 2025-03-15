@@ -1,5 +1,4 @@
 import os
-from stuned.utility.utils import PROJECT_ROOT_ENV_NAME
 
 
 PROJECT_ROOT = os.path.dirname(
@@ -8,4 +7,4 @@ PROJECT_ROOT = os.path.dirname(
     )
 )
 
-os.environ[PROJECT_ROOT_ENV_NAME] = PROJECT_ROOT
+os.environ["PROJECT_ROOT_PROVIDED_FOR_STUNED"] = PROJECT_ROOT

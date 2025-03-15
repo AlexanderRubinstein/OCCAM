@@ -9,7 +9,7 @@
             "name": "Python predict_masks.py",
             "type": "debugpy",
             "request": "launch",
-            "program": "./occam/predict_masks/predict_masks.py",
+            "program": "./scripts/predict_masks.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": [
@@ -20,6 +20,14 @@
                 "--output",
                 "./data/masks/Dino_FT/UrbanCars_test_masks_dino_ft_debug.pkl",
             ]
+        },
+        {
+            "name": "Python download_datasets.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "./scripts/download_datasets.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
         },
     ]
 }
