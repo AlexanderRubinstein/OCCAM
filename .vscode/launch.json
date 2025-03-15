@@ -16,9 +16,9 @@
                 "--model_id",
                 "dinosaur_base_patch14_518_topk3.coco_dv2_ft_s7_300k+10k",
                 "--input_folder",
-                "./data/datasets/UrbanCars/test/",
+                "./data/datasets/ImageNet-D/background",
                 "--output",
-                "./data/masks/Dino_FT/UrbanCars_test_masks_dino_ft_debug.pkl",
+                "./data/masks/Dino_FT/IN_D_background_masks_dino_ft_debug.pkl",
             ]
         },
         {

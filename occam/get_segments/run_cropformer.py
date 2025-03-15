@@ -29,15 +29,13 @@ sys.path.pop(0)
 sys.path.pop(0)
 
 
-# def in_range(i, range):
-#     if range is None:
-#         return True
-#     else:
-#         start, end = range[0], range[1]
-#         return start <= i < end
-
 class EntityNetV2(DefaultPredictor):
-    def __init__(self, args, instance_mode=ColorMode.IMAGE, store_dataloader=True):
+    def __init__(
+        self,
+        args,
+        instance_mode=ColorMode.IMAGE,
+        store_dataloader=True,
+    ):
         """
         Args:
             cfg (CfgNode):

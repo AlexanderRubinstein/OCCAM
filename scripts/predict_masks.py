@@ -19,7 +19,6 @@ from occam.submodules.dino_ft_wrapper import (
     load_model,
     get_masks_as_image
 )
-from occam.datasets.tardataset import TarDataset
 from occam.get_segments.run_cropformer import EntityNetV2
 from occam.datasets.utils import CustomImageFolder
 sys.path.pop(0)
@@ -27,7 +26,8 @@ sys.path.pop(0)
 
 from stuned.utility.utils import (
     optionally_make_dir,
-    get_project_root_path
+    get_project_root_path,
+    create_tar_from_folder
 )
 
 
@@ -92,15 +92,21 @@ if __name__ == "__main__":
         # Load Dataset
         # tar folder
         # e.g. .../cache/ImageNet1k/val_tar/tar_in_val.tar.gz
-        tar_path = os.path.join(TAR_FOLDER, os.path.basename(args.input_folder) + ".tar.gz")
-        optionally_make_dir(tar_path)
+        # if not os exits ...
 
+        # CropFormer requires a tar dataset
+        tar_path = os.path.join(TAR_FOLDER, os.path.basename(args.input_folder) + ".tar.gz")
+
+        if not os.path.exists(tar_path):
+            optionally_make_dir(tar_path)
+            create_tar_from_folder(tar_path, args.input_folder)
         # os.system(f"tar -hczf {tar_path} {target_folder}")
         input_path = tar_path
-        if input_path.endswith('.tar') or input_path.endswith('.tar.gz'):
-            dataset = TarDataset(input_path, transform=None)
-        else:
-            dataset = ImageFolder(input_path, transform=None)
+
+        # if input_path.endswith('.tar') or input_path.endswith('.tar.gz'):
+        #     dataset = TarDataset(input_path, transform=None)
+        # else:
+        #     dataset = ImageFolder(input_path, transform=None)
         if args.range is None:
             images_range = None
         else:

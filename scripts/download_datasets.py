@@ -5,12 +5,8 @@ import sys
 # local imports
 sys.path.insert(
     0,
-    # get_project_root_path()
     os.path.dirname(os.path.dirname(__file__))
 )
-# from occam.utils import (
-#     download_and_extract_tar
-# )
 import occam
 sys.path.pop(0)
 
