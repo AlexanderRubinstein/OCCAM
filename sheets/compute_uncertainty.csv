@@ -1,0 +1,2 @@
+comments,path_to_main,path_to_default_config,whether_to_run,delta:exec_path,delta:kwargs/range,delta:kwargs/result_path,delta:two_dash_flags,status,run_folder,stdout,stderr,walltime
+compute uncertainty scores for CLIPs,__RUNNER__,./configs/runner_config.yaml,1,./scripts/compute_uncertainty_results.py,DEFAULT,./data/results/uncertainty_scores/5clips_ensemble.pkl,[clips],,,,,

@@ -25,7 +25,17 @@ from occam.datasets.utils import CustomImageFolder
 sys.path.pop(0)
 
 
-from stuned.utility.utils import optionally_make_dir
+from stuned.utility.utils import (
+    optionally_make_dir,
+    get_project_root_path
+)
+
+
+TAR_FOLDER = os.path.join(
+    get_project_root_path(),
+    "data",
+    "tars"
+)
 
 
 def get_parser():
@@ -65,6 +75,8 @@ def pop_arg_from_opts(args, arg_name):
 if __name__ == "__main__":
     args = get_parser().parse_args()
 
+    optionally_make_dir(args.output)
+
     if args.mask_generator_type == "cropformer":
         assert args.num_slots is None, "num_slots should be None for cropformer"
         if args.output is None:
@@ -78,7 +90,13 @@ if __name__ == "__main__":
         print("Arguments: " + str(args))
 
         # Load Dataset
-        input_path = args.input
+        # tar folder
+        # e.g. .../cache/ImageNet1k/val_tar/tar_in_val.tar.gz
+        tar_path = os.path.join(TAR_FOLDER, os.path.basename(args.input_folder) + ".tar.gz")
+        optionally_make_dir(tar_path)
+
+        # os.system(f"tar -hczf {tar_path} {target_folder}")
+        input_path = tar_path
         if input_path.endswith('.tar') or input_path.endswith('.tar.gz'):
             dataset = TarDataset(input_path, transform=None)
         else:
@@ -98,7 +116,7 @@ if __name__ == "__main__":
         output = net.run(range=images_range)
 
         # Save Segments
-        os.makedirs(os.path.dirname(args.output), exist_ok=True)
+        # os.makedirs(os.path.dirname(args.output), exist_ok=True)
         pickle.dump(output, open(args.output, 'wb'))
 
     elif args.mask_generator_type == "dino-ft":
@@ -154,5 +172,5 @@ if __name__ == "__main__":
                     # "scores": None
                 }
         assert len(masks_to_pickle) == len(dl)
-        optionally_make_dir(args.output)
+        # optionally_make_dir(args.output)
         pickle.dump(masks_to_pickle, open(args.output, "wb"))

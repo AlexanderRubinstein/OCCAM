@@ -1,3 +1,3 @@
-path_to_main,path_to_default_config,whether_to_run,delta:exec_path,delta:kwargs/range,delta:kwargs/mask_generator_type,delta:kwargs/input_folder,delta:kwargs/input,delta:kwargs/output,status,run_folder,stdout,stderr,walltime
-,,,,,,,,,,,,,
-__RUNNER__,./configs/runner_config.yaml,1,./scripts/predict_masks.py,DEFAULT,dino-ft,./data/UrbanCars/test,DEFAULT,./data/masks/Dino_FT/UrbanCars_test_masks_dinoft.pkl,,,,,
+comments,path_to_main,path_to_default_config,whether_to_run,delta:exec_path,delta:kwargs/range,delta:kwargs/mask_generator_type,delta:kwargs/input_folder,delta:kwargs/output,status,run_folder,stdout,stderr,walltime
+masks for ImageNet validation,__RUNNER__,./configs/runner_config.yaml,1,./scripts/predict_masks.py,DEFAULT,cropformer,./data/ImageNet/val,./data/masks/in_val_masks.pkl,,,,,
+masks for ImageNet-D background,__RUNNER__,./configs/runner_config.yaml,1,./scripts/predict_masks.py,DEFAULT,dino-ft,./data/UrbanCars/test,./data/masks/Dino_FT/UrbanCars_test_masks_dinoft.pkl,,,,,
