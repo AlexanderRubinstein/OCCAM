@@ -1,14 +1,15 @@
 # import wget
 import os
 import sys
-import shutil
+# import shutil
 import torch
 import pandas as pd
-from tqdm import tqdm
-import xml.etree.ElementTree as ET
+# from tqdm import tqdm
+# import xml.etree.ElementTree as ET
 import numpy as np
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import torchvision
+import PIL
 # import json
 import yaml
 from sklearn.metrics import (
@@ -151,34 +152,6 @@ def make_bbox(bbox_path, n_channels=3):
     bbox = torch.zeros((1, height, width))
     bbox[:, y_min:y_max, x_min:x_max] = 1
     return torch.cat([bbox] * n_channels, dim=0)
-
-
-# def compute_bbox_fit_score(mask, bbox, extended_output=False):
-
-#     # intersection = (mask * bbox).sum()
-#     # outside_bbox = (mask * (1 - bbox)).sum()
-#     # bbox_fit_score = intersection / max(1, outside_bbox)  # to filter out background
-#     mask_shape_len = len(mask.shape)
-#     assert mask.shape == bbox.shape
-#     if mask_shape_len == 4:
-#         mask = mask[0]
-#         bbox = bbox[0]
-#     assert mask_shape_len == 3
-
-#     # make sure that mask and bbox are binary even after transform with interpolation
-#     mask = mask == 1
-#     bbox = bbox == 1
-#     bbox_fit_score, intersection, union = iou(mask, bbox)
-
-#     bbox_fit_score = bbox_fit_score.mean().item()
-#     intersection = intersection.mean().item()
-#     union = union.mean().item()
-
-#     if extended_output:
-#         # return bbox_fit_score, intersection, outside_bbox
-#         return bbox_fit_score, intersection, union
-#     else:
-#         return bbox_fit_score
 
 
 def compute_bbox_fit_score(mask, bbox, extended_output=False):
@@ -530,6 +503,33 @@ def get_return_tuple(
     apply_mask=True
 ):
 
+    def transform_image_mask_bbox(
+        image,
+        mask,
+        bbox,
+        image_transform,
+        mask_transform,
+        seed=None
+    ):
+
+        if seed is None:
+            seed = torch.randint(0, 2**32, (1,)).item()
+
+        apply_random_seed(seed)
+        image = mask_transform(image) # all but normalization
+        image = image_transform(image) # normalization
+        apply_random_seed(seed)
+        bbox = mask_transform(bbox)
+        apply_random_seed(seed)
+        mask = mask_transform(mask)
+        bbox = (bbox > 0).to(image.dtype) # to avoid interpolation artifacts
+        mask = (mask > 0).to(image.dtype) # to avoid interpolation artifacts
+
+        bbox = torch.cat([bbox] * 3, dim=0)
+        mask = torch.cat([mask] * 3, dim=0)
+        assert image.shape == bbox.shape == mask.shape
+        return image, mask, bbox
+
     def transform_before_mask_apply(
         idx,
         image,
@@ -558,22 +558,32 @@ def get_return_tuple(
 
         # image = image_transform(image)
 
-        seed = torch.randint(0, 2**32, (1,)).item()
+        # seed = torch.randint(0, 2**32, (1,)).item()
 
-        apply_random_seed(seed)
-        image = mask_transform(image) # all but normalization
-        image = image_transform(image) # normalization
-        apply_random_seed(seed)
-        bbox = mask_transform(bbox)
-        apply_random_seed(seed)
-        mask = mask_transform(mask)
+        # apply_random_seed(seed)
+        # image = mask_transform(image) # all but normalization
+        # image = image_transform(image) # normalization
+        # apply_random_seed(seed)
+        # bbox = mask_transform(bbox)
+        # apply_random_seed(seed)
+        # mask = mask_transform(mask)
 
-        bbox = (bbox > 0).to(image.dtype) # to avoid interpolation artifacts
-        mask = (mask > 0).to(image.dtype) # to avoid interpolation artifacts
+        # bbox = (bbox > 0).to(image.dtype) # to avoid interpolation artifacts
+        # mask = (mask > 0).to(image.dtype) # to avoid interpolation artifacts
 
-        bbox = torch.cat([bbox] * 3, dim=0)
-        mask = torch.cat([mask] * 3, dim=0)
-        assert image.shape == bbox.shape == mask.shape
+        # bbox = torch.cat([bbox] * 3, dim=0)
+        # mask = torch.cat([mask] * 3, dim=0)
+        # assert image.shape == bbox.shape == mask.shape
+
+        image, mask, bbox = transform_image_mask_bbox(
+            image,
+            mask,
+            bbox,
+            image_transform,
+            mask_transform
+        )
+
+        # assert image.shape == bbox.shape
 
         # can have empty mask after aggresive transform, e.g. strong crop
         if mask.max() > 0:
@@ -588,7 +598,8 @@ def get_return_tuple(
                 obj_type="applied_mask"
             )
         else:
-            applied_mask = torch.zeros_like(image) * 0.5 # gray image
+            applied_mask = torch.zeros_like(image, dtype=torch.float32) * 0.5 # gray image
+        # prepare_applied_mask_maker returns float, while zeros_like returns double, we want to always use float
         return image, mask, bbox, applied_mask
 
     def transform_after_mask_apply(image, mask, transform, current_cache_path):
@@ -644,15 +655,20 @@ def get_return_tuple(
 
         assert bbox.shape[2] == 1
         if bbox.shape[:2] != image.shape[:2]:
-            if allow_bbox_shape_mismatch:
-                print(f"Bbox shape mismatch of {bbox.shape[:2]} (bbox.shape) "
-                    f"vs {image.shape[:2]} (image.shape) "
-                    f"for {source_image_path}"
-                )
-                bbox = np.ones_like(image)[:, :, 0][..., None]
-
+            if image.shape[0] == bbox.shape[1] and image.shape[1] == bbox.shape[0]:
+                # sometimes read_image from detectron2 rotates image to surpass pillow bug
+                # see "_apply_exif_orientation" here: https://detectron2.readthedocs.io/en/latest/_modules/detectron2/data/detection_utils.html
+                image = image.transpose(1, 0, 2)
             else:
-                raise ValueError("bbox shape mismatch")
+                if allow_bbox_shape_mismatch:
+                    print(f"Bbox shape mismatch of {bbox.shape[:2]} (bbox.shape) "
+                        f"vs {image.shape[:2]} (image.shape) "
+                        f"for {source_image_path}"
+                    )
+                    bbox = np.ones_like(image)[:, :, 0][..., None]
+
+                else:
+                    raise ValueError("bbox shape mismatch")
 
     # if mask_path is not None:
     if not isinstance(mask_path, str) and np.isnan(mask_path):
@@ -663,7 +679,10 @@ def get_return_tuple(
         mask = bbox
     else:
 
-        all_masks = torch.load(mask_path)
+        all_masks = torch.load(mask_path, weights_only=False)
+        assert all_masks.max() >= mask_value, \
+            f"mask_value: {mask_value} is greater than the maximum mask " \
+            f"value: {all_masks.max()} for {mask_path}"
         mask = (all_masks == mask_value)
         if len(mask.shape) == 3:
             mask = mask[0] # extract first channel as we will duplicate channels later
@@ -678,7 +697,9 @@ def get_return_tuple(
 
     if mask.max() == 0:
         print(f"Mask.max() is 0 "
-            f"for {source_image_path}. Using whole image as mask instead."
+            f"for {source_image_path}. Using whole image as mask instead.\n"
+            f"mask_path: {mask_path}\n"
+            f"mask_value: {mask_value}\n"
         )
         mask = np.ones_like(mask)
 
@@ -714,9 +735,16 @@ def get_return_tuple(
 
     if (extended_output or not apply_mask):
         if dataset_task == "classification":
-            image = image_transform(mask_transform(image))
-            mask = mask_transform(mask)
-            bbox = mask_transform(bbox)
+            # image = image_transform(mask_transform(image))
+            # mask = mask_transform(mask)
+            # bbox = mask_transform(bbox)
+            image, mask, bbox = transform_image_mask_bbox(
+                image,
+                mask,
+                bbox,
+                image_transform,
+                mask_transform
+            )
 
     if not apply_mask:
         applied_mask = (image, mask)
@@ -878,196 +906,198 @@ class ImageNetBBoxAnnotations(Dataset):
         save_every=100
     ):
 
-        def is_wnid(class_id):
-            is_wnid = True
-            if not len(class_id) == 9:
-                is_wnid = False
+        raise NotImplementedError("Not implemented, see \"make_df_with_foreground_scores\"")
 
-            if not class_id[0] == "n":
-                is_wnid = False
+        # def is_wnid(class_id):
+        #     is_wnid = True
+        #     if not len(class_id) == 9:
+        #         is_wnid = False
 
-            if not class_id[1:].isalnum():
-                is_wnid = False
+        #     if not class_id[0] == "n":
+        #         is_wnid = False
 
-            return is_wnid
+        #     if not class_id[1:].isalnum():
+        #         is_wnid = False
 
-        def process_masks(
-            all_masks,
-            image_path,
-            mask_id,
-            mapping_dict,
-            bbox_path
-        ):
+        #     return is_wnid
 
-            def update_max_and_key(cur_value, cur_key, cache, cache_key):
-                # update max value
-                max_value, max_key = cache[cache_key]
-                if cur_value > max_value:
-                    cache[cache_key] = [cur_value, cur_key]
+        # def process_masks(
+        #     all_masks,
+        #     image_path,
+        #     mask_id,
+        #     mapping_dict,
+        #     bbox_path
+        # ):
 
-            cur_masks = all_masks[mask_id]['mask']
-            mask_values = np.unique(cur_masks).tolist()
+        #     def update_max_and_key(cur_value, cur_key, cache, cache_key):
+        #         # update max value
+        #         max_value, max_key = cache[cache_key]
+        #         if cur_value > max_value:
+        #             cache[cache_key] = [cur_value, cur_key]
 
-            # variables to find mask with the best bbox_fit_score
-            cache_for_max_bbox_fit_score = {
-                "all": [np.inf * -1, None],
-                "non-bg": [np.inf * -1, None]
-            }
+        #     cur_masks = all_masks[mask_id]['mask']
+        #     mask_values = np.unique(cur_masks).tolist()
 
-            key_per_mask_value_max = None
-            # key_per_mask_value_no_bg = None
-            # bbox = make_bbox(bbox_path).numpy()
-            bbox = make_bbox(bbox_path)
-            bbox = (bbox == 1)
+        #     # variables to find mask with the best bbox_fit_score
+        #     cache_for_max_bbox_fit_score = {
+        #         "all": [np.inf * -1, None],
+        #         "non-bg": [np.inf * -1, None]
+        #     }
 
-            mask_shape = cur_masks.shape[-2:]
-            bbox_shape = bbox.shape[-2:]
-            if mask_shape != bbox_shape:
-                mismatch_info = (
-                    mask_shape,
-                    bbox_shape,
-                    image_path,
-                    mask_id,
-                    bbox_path
-                )
-                if "mismatch" not in mapping_dict:
-                    mapping_dict["mismatch"] = [mismatch_info]
-                else:
-                    mapping_dict["mismatch"].append(mismatch_info)
-                print(mismatch_info)
-                return
+        #     key_per_mask_value_max = None
+        #     # key_per_mask_value_no_bg = None
+        #     # bbox = make_bbox(bbox_path).numpy()
+        #     bbox = make_bbox(bbox_path)
+        #     bbox = (bbox == 1)
 
-            cur_mapping_dict = {}
+        #     mask_shape = cur_masks.shape[-2:]
+        #     bbox_shape = bbox.shape[-2:]
+        #     if mask_shape != bbox_shape:
+        #         mismatch_info = (
+        #             mask_shape,
+        #             bbox_shape,
+        #             image_path,
+        #             mask_id,
+        #             bbox_path
+        #         )
+        #         if "mismatch" not in mapping_dict:
+        #             mapping_dict["mismatch"] = [mismatch_info]
+        #         else:
+        #             mapping_dict["mismatch"].append(mismatch_info)
+        #         print(mismatch_info)
+        #         return
 
-            for mask_value in mask_values:
-                key_per_mask_value = (mask_id + f"_{mask_value}").replace("/", "_")
+        #     cur_mapping_dict = {}
 
-                if key_per_mask_value in mapping_dict:
-                    continue
+        #     for mask_value in mask_values:
+        #         key_per_mask_value = (mask_id + f"_{mask_value}").replace("/", "_")
 
-                mask_per_value = (cur_masks == mask_value)
-                if mask_per_value.sum() < MIN_NON_ZERO_PIXELS:
-                    continue
-                mask_per_value = np.concatenate(
-                    [mask_per_value[None, ...]] * bbox.shape[0],
-                    axis=0
-                )
+        #         if key_per_mask_value in mapping_dict:
+        #             continue
 
-                mask_per_value_path = os.path.join(
-                    mask_per_value_folder,
-                    key_per_mask_value + ".pt"
-                )
+        #         mask_per_value = (cur_masks == mask_value)
+        #         if mask_per_value.sum() < MIN_NON_ZERO_PIXELS:
+        #             continue
+        #         mask_per_value = np.concatenate(
+        #             [mask_per_value[None, ...]] * bbox.shape[0],
+        #             axis=0
+        #         )
 
-                torch.save(mask_per_value, mask_per_value_path)
-                is_main_object = 0
+        #         mask_per_value_path = os.path.join(
+        #             mask_per_value_folder,
+        #             key_per_mask_value + ".pt"
+        #         )
 
-                cur_mapping_dict[key_per_mask_value] = [
-                    base_id,
-                    image_path,
-                    bbox_path,
-                    mask_id,
-                    mask_per_value_path,
-                    is_main_object
-                ]
+        #         torch.save(mask_per_value, mask_per_value_path)
+        #         is_main_object = 0
 
-                mask_per_value = (torch.Tensor(mask_per_value) == 1)
-                # bbox = (torch.Tensor(bbox) == 1)
+        #         cur_mapping_dict[key_per_mask_value] = [
+        #             base_id,
+        #             image_path,
+        #             bbox_path,
+        #             mask_id,
+        #             mask_per_value_path,
+        #             is_main_object
+        #         ]
 
-                bbox_fit_score = compute_bbox_fit_score(mask_per_value, bbox)
+        #         mask_per_value = (torch.Tensor(mask_per_value) == 1)
+        #         # bbox = (torch.Tensor(bbox) == 1)
 
-                update_max_and_key(
-                    bbox_fit_score,
-                    key_per_mask_value,
-                    cache_for_max_bbox_fit_score,
-                    "all"
-                )
-                if not is_background(
-                    mask_per_value[0],
-                    threshold=NUM_CORNER_PIXELS_FOR_BG,
-                    to_extract=False
-                ):
-                    update_max_and_key(
-                        bbox_fit_score,
-                        key_per_mask_value,
-                        cache_for_max_bbox_fit_score,
-                        "non-bg"
-                    )
+        #         bbox_fit_score = compute_bbox_fit_score(mask_per_value, bbox)
 
-            key_per_mask_value_max = cache_for_max_bbox_fit_score["non-bg"][1]
-            if key_per_mask_value_max is None:
-                key_per_mask_value_max = cache_for_max_bbox_fit_score["all"][1]
+        #         update_max_and_key(
+        #             bbox_fit_score,
+        #             key_per_mask_value,
+        #             cache_for_max_bbox_fit_score,
+        #             "all"
+        #         )
+        #         if not is_background(
+        #             mask_per_value[0],
+        #             threshold=NUM_CORNER_PIXELS_FOR_BG,
+        #             to_extract=False
+        #         ):
+        #             update_max_and_key(
+        #                 bbox_fit_score,
+        #                 key_per_mask_value,
+        #                 cache_for_max_bbox_fit_score,
+        #                 "non-bg"
+        #             )
 
-            assert key_per_mask_value_max is not None
-            item_to_update = cur_mapping_dict[key_per_mask_value_max]
-            item_to_update[-1] = 1
-            cur_mapping_dict[key_per_mask_value_max] = item_to_update
+        #     key_per_mask_value_max = cache_for_max_bbox_fit_score["non-bg"][1]
+        #     if key_per_mask_value_max is None:
+        #         key_per_mask_value_max = cache_for_max_bbox_fit_score["all"][1]
 
-            mapping_dict |= cur_mapping_dict
+        #     assert key_per_mask_value_max is not None
+        #     item_to_update = cur_mapping_dict[key_per_mask_value_max]
+        #     item_to_update[-1] = 1
+        #     cur_mapping_dict[key_per_mask_value_max] = item_to_update
 
-        tmp_mapping_dict_path = mapping_dict_path + ".tmp"
+        #     mapping_dict |= cur_mapping_dict
 
-        if not os.path.exists(mapping_dict_path):
-            os.makedirs(os.path.dirname(mapping_dict_path), exist_ok=True)
+        # tmp_mapping_dict_path = mapping_dict_path + ".tmp"
 
-            if isinstance(self.masks, str):
-                self.masks = load_from_pickle(self.masks)
+        # if not os.path.exists(mapping_dict_path):
+        #     os.makedirs(os.path.dirname(mapping_dict_path), exist_ok=True)
 
-            mask_id_prefix = get_mask_id_prefix(self.masks)
+        #     if isinstance(self.masks, str):
+        #         self.masks = load_from_pickle(self.masks)
 
-            if os.path.exists(tmp_mapping_dict_path):
-                print("Loading mapping dict from tmp file")
-                mapping_dict = torch.load(tmp_mapping_dict_path)
-            else:
-                mapping_dict = {}
+        #     mask_id_prefix = get_mask_id_prefix(self.masks)
 
-            cnt = 0
-            os.makedirs(mask_per_value_folder, exist_ok=True)
+        #     if os.path.exists(tmp_mapping_dict_path):
+        #         print("Loading mapping dict from tmp file")
+        #         mapping_dict = torch.load(tmp_mapping_dict_path)
+        #     else:
+        #         mapping_dict = {}
 
-            for base_id in tqdm(range(len(self.base_dataset.samples))):
+        #     cnt = 0
+        #     os.makedirs(mask_per_value_folder, exist_ok=True)
 
-                path_target = self.base_dataset.samples[base_id]
-                path = path_target[0]
+        #     for base_id in tqdm(range(len(self.base_dataset.samples))):
 
-                image_name = os.path.basename(path)
+        #         path_target = self.base_dataset.samples[base_id]
+        #         path = path_target[0]
 
-                class_id = os.path.basename(os.path.dirname(path))
+        #         image_name = os.path.basename(path)
 
-                # if is_wnid(class_id):
-                if self.bboxes_type == "val":
-                    folder_path = self.bboxes_folder
-                else:
+        #         class_id = os.path.basename(os.path.dirname(path))
 
-                    folder_path = os.path.join(
-                        self.bboxes_folder,
-                        class_id
-                    )
+        #         # if is_wnid(class_id):
+        #         if self.bboxes_type == "val":
+        #             folder_path = self.bboxes_folder
+        #         else:
 
-                bbox_path = os.path.join(
-                    folder_path,
-                    image_name.replace(".JPEG", ".xml")
-                )
+        #             folder_path = os.path.join(
+        #                 self.bboxes_folder,
+        #                 class_id
+        #             )
 
-                if not os.path.exists(bbox_path):
-                    continue
+        #         bbox_path = os.path.join(
+        #             folder_path,
+        #             image_name.replace(".JPEG", ".xml")
+        #         )
 
-                mask_id = os.path.join(mask_id_prefix, class_id, image_name)
-                if not mask_id in self.masks:
-                    continue
+        #         if not os.path.exists(bbox_path):
+        #             continue
 
-                process_masks(self.masks, path, mask_id, mapping_dict, bbox_path)
-                cnt += 1
-                if cnt == len(self.masks):
-                    break
+        #         mask_id = os.path.join(mask_id_prefix, class_id, image_name)
+        #         if not mask_id in self.masks:
+        #             continue
 
-                if cnt % save_every == 0:
-                    torch.save(mapping_dict, tmp_mapping_dict_path)
-        else:
-            mapping_dict = torch.load(mapping_dict_path)
+        #         process_masks(self.masks, path, mask_id, mapping_dict, bbox_path)
+        #         cnt += 1
+        #         if cnt == len(self.masks):
+        #             break
 
-        torch.save(mapping_dict, mapping_dict_path)
-        if os.path.exists(tmp_mapping_dict_path):
-            os.remove(tmp_mapping_dict_path)
-        return mapping_dict
+        #         if cnt % save_every == 0:
+        #             torch.save(mapping_dict, tmp_mapping_dict_path)
+        # else:
+        #     mapping_dict = torch.load(mapping_dict_path)
+
+        # torch.save(mapping_dict, mapping_dict_path)
+        # if os.path.exists(tmp_mapping_dict_path):
+        #     os.remove(tmp_mapping_dict_path)
+        # return mapping_dict
 
     def __getitem__(self, idx):
 
@@ -1168,30 +1198,94 @@ def make_image_mask_transforms(transform_config):
 
 
 # split full transform into specific transform (Normalize) and common transform (everything else)
-# common transform is applied to both image and mask
-# specific transform is applied only to image
+# first, common transform is applied to both image and mask
+# then, specific transform is applied only to image
 def make_common_and_specific_transforms(transform_config):
+
+    def is_rgb_convert(transform_name):
+        if isinstance(transform_name, torchvision.transforms.transforms.Lambda):
+            lambda_code = transform_name.__dict__['lambd'].__code__
+            return (
+                    'RGB' in lambda_code.co_consts
+                and
+                    'convert' in lambda_code.co_names
+            )
+        return "to_rgb" in str(transform_name)
+
+    def flatten_compose(all_transforms):
+        flattened_transforms = []
+        for transform_name in all_transforms:
+            if isinstance(transform_name, torchvision.transforms.transforms.Compose):
+                flattened_compose = flatten_compose(transform_name.transforms)
+                flattened_transforms.extend(flattened_compose)
+                # all_transforms.remove(transform_name)
+            else:
+                flattened_transforms.append(transform_name)
+        return flattened_transforms
+
+    def split_in_common_and_specific(all_list):
+        common_list = []
+        specific_list = []
+        insert_in_the_beginning = []
+
+        all_list = flatten_compose(all_list)
+
+        for transform_name in all_list:
+
+            if "Normalize" in str(transform_name):
+                specific_list.append(transform_name)
+            elif "ToTensor" in str(transform_name):
+                insert_in_the_beginning.append(transform_name)
+            # elif "to_rgb" in str(transform_name):
+            elif is_rgb_convert(transform_name):
+                optional_convert = lambda x: transform_name(x) if isinstance(x, PIL.Image.Image) else x
+                insert_in_the_beginning.append(optional_convert)
+            else:
+                common_list.append(transform_name)
+        common_list = insert_in_the_beginning + common_list
+        return common_list, specific_list
 
     if transform_config is None:
         return lambda x: x, lambda x: x
 
-    common_transform_config = copy.deepcopy(transform_config)
-    specific_transform_config = copy.deepcopy(transform_config)
-    specific_transform_config["transforms_list"] = []
+    common_transform = copy.deepcopy(transform_config)
+    specific_transform = copy.deepcopy(transform_config)
 
-    common_transform_config["transforms_list"] = []
-    for transform_name in transform_config["transforms_list"]:
-        if "Normalize" in transform_name:
-            # transform_name = transform_name.replace("Random", "Common")
-            specific_transform_config["transforms_list"] = [transform_name]
-        else:
-            common_transform_config["transforms_list"].append(transform_name)
+    if isinstance(transform_config, torchvision.transforms.transforms.Compose):
+        # return transform_config, lambda x: x
+        common_list, specific_list = split_in_common_and_specific(transform_config.transforms)
 
-    common_transform = make_transforms(common_transform_config)
-    specific_transform = make_transforms(specific_transform_config)
+        # common_transform = copy.deepcopy(transform_config)
+        # specific_transform = copy.deepcopy(transform_config)
+        common_transform.transforms = common_list
+        specific_transform.transforms = specific_list
 
-    if specific_transform is None:
-        specific_transform = lambda x: x
+    else:
+        assert isinstance(transform_config, dict)
+
+        # return common_transform, specific_transform
+
+        # common_transform_config = copy.deepcopy(transform_config)
+        # specific_transform_config = copy.deepcopy(transform_config)
+        common_list, specific_list = split_in_common_and_specific(
+            transform_config["transforms_list"]
+        )
+        common_transform["transforms_list"] = common_list
+        specific_transform["transforms_list"] = specific_list
+
+        # common_transform_config["transforms_list"] = []
+        # for transform_name in transform_config["transforms_list"]:
+        #     if "Normalize" in transform_name:
+        #         # transform_name = transform_name.replace("Random", "Common")
+        #         specific_transform_config["transforms_list"] = [transform_name]
+        #     else:
+        #         common_transform_config["transforms_list"].append(transform_name)
+
+        common_transform = make_transforms(common_transform)
+        specific_transform = make_transforms(specific_transform)
+
+    # if specific_transform is None:
+    #     specific_transform = lambda x: x
 
     return common_transform, specific_transform
 

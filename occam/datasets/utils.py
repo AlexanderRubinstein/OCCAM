@@ -602,7 +602,7 @@ def make_source_df(
         # shape_mismatch_info = None
         # mask_value_for_main_object = 0
         main_object_label = 1
-        masks = torch.load(mask_path)
+        masks = torch.load(mask_path, weights_only=False)
 
         all_mask_values = np.unique(masks).tolist()
         # metadata = {}

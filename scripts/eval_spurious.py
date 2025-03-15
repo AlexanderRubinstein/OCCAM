@@ -272,12 +272,12 @@ def add_clip_models(models_dict, category_list, dataset_name, siglip=False):
     else:
         add_openai_clip_model('ViT-L/14', category_list, models_dict)
         add_alpha_clip_model("ViT-L/14", category_list, models_dict)
-        add_openclip_model(
-            model_id='ViT-L-14-quickgelu',
-            category_list=category_list,
-            models_dict=models_dict,
-            pretrained='dfn2b'
-        )
+        # add_openclip_model(
+        #     model_id='ViT-L-14-quickgelu',
+        #     category_list=category_list,
+        #     models_dict=models_dict,
+        #     pretrained='dfn2b'
+        # )
         add_openai_clip_model('RN50', category_list, models_dict)
     if siglip:
         add_openclip_model(
@@ -286,30 +286,30 @@ def add_clip_models(models_dict, category_list, dataset_name, siglip=False):
             models_dict=models_dict,
             pretrained='webli'
         )
-        add_openclip_model(
-            model_id='nllb-clip-base-siglip',
-            category_list=category_list,
-            models_dict=models_dict,
-            pretrained='v1'
-        )
-        add_openclip_model(
-            model_id='nllb-clip-base-siglip',
-            category_list=category_list,
-            models_dict=models_dict,
-            pretrained='mrl'
-        )
-        add_openclip_model(
-            model_id='nllb-clip-large-siglip',
-            category_list=category_list,
-            models_dict=models_dict,
-            pretrained='v1'
-        )
-        add_openclip_model(
-            model_id='nllb-clip-large-siglip',
-            category_list=category_list,
-            models_dict=models_dict,
-            pretrained='mrl'
-        )
+        # add_openclip_model(
+        #     model_id='nllb-clip-base-siglip',
+        #     category_list=category_list,
+        #     models_dict=models_dict,
+        #     pretrained='v1'
+        # )
+        # add_openclip_model(
+        #     model_id='nllb-clip-base-siglip',
+        #     category_list=category_list,
+        #     models_dict=models_dict,
+        #     pretrained='mrl'
+        # )
+        # add_openclip_model(
+        #     model_id='nllb-clip-large-siglip',
+        #     category_list=category_list,
+        #     models_dict=models_dict,
+        #     pretrained='v1'
+        # )
+        # add_openclip_model(
+        #     model_id='nllb-clip-large-siglip',
+        #     category_list=category_list,
+        #     models_dict=models_dict,
+        #     pretrained='mrl'
+        # )
         # add_openclip_model(
         #     model_id='ViT-bigG-14',
         #     category_list=category_list,

@@ -16,7 +16,7 @@ sys.path.insert(
        get_project_root_path()
     )
 )
-from occam.submodules import alpha_clip
+from occam.submodules.alpha_clip import alpha_clip
 sys.path.pop(0)
 
 

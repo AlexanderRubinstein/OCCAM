@@ -44,7 +44,7 @@
                 "--confidence-threshold",
                 "0.5",
                 "--config_file",
-                "./configs/cropformer_hornet.yaml"
+                "./configs/cropformer/cropformer_hornet.yaml"
             ]
         },
         {
