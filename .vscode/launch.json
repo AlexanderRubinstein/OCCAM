@@ -18,7 +18,7 @@
                 "--input_folder",
                 "./data/datasets/ImageNet-D/background",
                 "--output",
-                "./data/masks/Dino_FT/IN_D_background_masks_dino_ft_debug.pkl",
+                "./data/masks/dino_ft/IN_D_background_masks_debug.pkl",
                 "--mask_generator_type",
                 "dino-ft",
                 "--num_slots",
@@ -36,7 +36,7 @@
                 "--input_folder",
                 "./data/datasets/ImageNet-D/background",
                 "--output",
-                "./data/masks/Cropformer/IN_D_background_masks_cropformer_debug.pkl",
+                "./data/masks/cropformer/IN_D_background_masks_debug.pkl",
                 "--mask_generator_type",
                 "cropformer",
                 "--model_path",
@@ -45,6 +45,25 @@
                 "0.5",
                 "--config_file",
                 "./configs/cropformer_hornet.yaml"
+            ]
+        },
+        {
+            "name": "Python eval_spurious.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "./scripts/eval_spurious.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--result_path",
+                "./data/results/eval_spurious/in_d_clip_debug.pkl",
+                "--recompute_all",
+                "--clip",
+                "--siglip",
+                "--dataset_name",
+                "imagenet_d",
+                "--mask_source",
+                "dino_ft",
             ]
         },
         {

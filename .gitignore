@@ -6,6 +6,7 @@ data
 experiments
 tmp
 slurm_outputs
+*.lock
 
 
 # Byte-compiled / optimized / DLL files

@@ -2,53 +2,74 @@ import os
 import sys
 import argparse
 import torch
-import torchvision
-import types
-import timm
+# import torchvision
+# import types
+# import timm
 import pandas as pd
 
 
 sys.path.insert(
     0,
     os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), "src"
+        os.path.dirname(os.path.dirname(__file__))
     )
 )
-sys.path.insert(
-    0,
-    os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), "notebooks"
-    )
-)
-from debiasing import (
-    COUNTER_PATH,
-    COMMON_PATH,
-    VIT_L_EVAL_TRANSFORM_CONFIG,
+# sys.path.insert(
+#     0,
+#     os.path.join(
+#         os.path.dirname(os.path.dirname(__file__)), "notebooks"
+#     )
+# )
+# from debiasing import (
+#     # COUNTER_PATH,
+#     # COMMON_PATH,
+#     # VIT_L_EVAL_TRANSFORM_CONFIG,
+#     make_df_with_foreground_scores,
+#     eval_models,
+#     # load_model,
+#     # add_lle_model
+# ) ??
+
+# sys.path.pop(0)
+from occam.robust_classification.eval import (
+    ENCODED_NAME_SEP,
     make_df_with_foreground_scores,
     eval_models,
-    load_model,
-    add_lle_model
 )
-from densifier.datasets.imagenet_d import get_in_d_category_list
-from densifier.datasets.imagenet_classes import get_in_classes_prompts
-from densifier.eval_clip.eval import (
+from occam.robust_classification.models import (
     add_openai_clip_model,
     add_alpha_clip_model,
+    add_openclip_model
 )
-from densifier.datasets.waterbirds import (
+from occam.datasets.imagenet_d import (
+    IN_D_BG_PATH,
+    get_in_d_category_list,
+)
+from occam.datasets.imagenet_classes import get_in_classes_prompts
+# from occam.eval_clip.eval import (
+#     add_openai_clip_model,
+#     add_alpha_clip_model,
+# ) ??
+from occam.datasets.waterbirds import (
+    WATERBIRDS_PATHS,
     get_clip_wb_category_list
 )
-from densifier.datasets.urban_cars import (
+from occam.datasets.urban_cars import (
+    URBAN_CARS_PATH,
     get_clip_uc_category_list
 )
-from densifier.datasets.counter_animal import (
-    make_counter_animal_categories
+from occam.datasets.counter_animal import (
+    COUNTER_PATH,
+    COMMON_PATH,
+    # make_counter_animal_categories
 )
-sys.path.pop(0)
-
-from densifier.datasets.imagenet_9 import (
-    get_in_9_category_list
+from occam.datasets.imagenet_9 import (
+    IMAGENET_9_PATH,
+    # get_in_9_category_list
 )
+# from occam.datasets.utils import (
+#     make_mapping_dict_generic_from_folder
+# )
 sys.path.pop(0)
 
 
@@ -62,11 +83,8 @@ from stuned.utility.utils import (
 )
 
 
-CACHE_PATH = "/mnt/lustre/work/oh/arubinstein17/cache"
-
-
 def get_parser():
-    parser = argparse.ArgumentParser(description="add background scores and eval on Urban Cars")
+    parser = argparse.ArgumentParser(description="add background scores and eval on spurious backgrounds datasets")
     parser.add_argument(
         "--result_path",
         default="/home/oh/arubinstein17/github/densification/data/results/for_runner_eval_uc.pth",
@@ -88,6 +106,11 @@ def get_parser():
         help="use clip"
     )
     parser.add_argument(
+        "--siglip",
+        action="store_true",
+        help="use siglip"
+    )
+    parser.add_argument(
         "--batch_size",
         type=int,
         default=128,
@@ -102,10 +125,251 @@ def get_parser():
     return parser
 
 
-def add_clip_models(models_dict, category_list):
-    add_openai_clip_model('ViT-L/14', category_list, models_dict)
-    add_alpha_clip_model("ViT-L/14", category_list, models_dict)
+def add_clip_models(models_dict, category_list, dataset_name, siglip=False):
+    if dataset_name == "counter_animal_gap":
+        add_openai_clip_model('RN50', category_list, models_dict)
+        add_openai_clip_model('RN101', category_list, models_dict)
+        add_openai_clip_model('RN50x4', category_list, models_dict)
+        add_openai_clip_model('RN50x16', category_list, models_dict)
+        add_openai_clip_model('RN50x64', category_list, models_dict)
+        add_openai_clip_model('ViT-B/32', category_list, models_dict)
+        add_openai_clip_model('ViT-B/16', category_list, models_dict)
+        add_openai_clip_model('ViT-L/14', category_list, models_dict)
+        add_openai_clip_model('ViT-L/14@336px', category_list, models_dict)
 
+        # 'ViT-B-16'
+        add_openclip_model(
+            model_id='ViT-B-16',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='laion400m_e32'
+        )
+        add_openclip_model(
+            model_id='ViT-B-16',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='datacomp_l_s1b_b8k'
+        )
+        add_openclip_model(
+            model_id='ViT-B-16',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='laion2b_s34b_b88k'
+        )
+        add_openclip_model(
+            model_id='ViT-B-16',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='dfn2b'
+        )
+
+        # 'ViT-B-32'
+        add_openclip_model(
+            model_id='ViT-B-32',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='laion400m_e32'
+        )
+        add_openclip_model(
+            model_id='ViT-B-32',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='datacomp_s_s13m_b4k'
+        )
+        add_openclip_model(
+            model_id='ViT-B-32',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='laion2b_s34b_b79k'
+        )
+        add_openclip_model(
+            model_id='ViT-B-32-256',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='datacomp_s34b_b86k'
+        )
+        # add_openclip_model(
+        #     model_id='ViT-B-32',
+        #     category_list=category_list,
+        #     models_dict=models_dict,
+        #     pretrained='dfn2b'
+        # )
+
+        # 'ViT-L-14'
+        add_openclip_model(
+            model_id='ViT-L-14',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='laion400m_e32'
+        )
+        add_openclip_model(
+            model_id='ViT-L-14',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='datacomp_xl_s13b_b90k'
+        )
+        add_openclip_model(
+            model_id='ViT-L-14',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='laion2b_s32b_b82k'
+        )
+        add_openclip_model(
+            model_id='ViT-L-14-quickgelu',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='dfn2b'
+        )
+
+        # 'ViT-H-14'
+        add_openclip_model(
+            model_id='ViT-H-14',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='laion2b_s32b_b79k'
+        )
+        add_openclip_model(
+            model_id='ViT-H-14-quickgelu',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='dfn5b'
+        )
+        add_openclip_model(
+            model_id='ViT-H-14-378-quickgelu',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='dfn5b'
+        )
+
+        # 'ViT-G-14'
+        add_openclip_model(
+            model_id='ViT-g-14',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='laion2b_s34b_b88k'
+        )
+        add_openclip_model(
+            model_id='ViT-bigG-14',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='laion2b_s39b_b160k'
+        )
+
+        # 'ConvNext-B'
+        add_openclip_model(
+            model_id='convnext_base',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='laion400m_s13b_b51k'
+        )
+        add_openclip_model(
+            model_id='convnext_base_w',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='laion2b_s13b_b82k'
+        )
+
+    else:
+        add_openai_clip_model('ViT-L/14', category_list, models_dict)
+        add_alpha_clip_model("ViT-L/14", category_list, models_dict)
+        add_openclip_model(
+            model_id='ViT-L-14-quickgelu',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='dfn2b'
+        )
+        add_openai_clip_model('RN50', category_list, models_dict)
+    if siglip:
+        add_openclip_model(
+            model_id='ViT-SO400M-14-SigLIP-384',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='webli'
+        )
+        add_openclip_model(
+            model_id='nllb-clip-base-siglip',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='v1'
+        )
+        add_openclip_model(
+            model_id='nllb-clip-base-siglip',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='mrl'
+        )
+        add_openclip_model(
+            model_id='nllb-clip-large-siglip',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='v1'
+        )
+        add_openclip_model(
+            model_id='nllb-clip-large-siglip',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='mrl'
+        )
+        # add_openclip_model(
+        #     model_id='ViT-bigG-14',
+        #     category_list=category_list,
+        #     models_dict=models_dict,
+        #     pretrained='laion2b_s39b_b160k'
+        # )
+        add_openclip_model(
+            model_id='ViT-B-16-SigLIP',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='webli'
+        )
+        add_openclip_model(
+            model_id='ViT-B-16-SigLIP-256',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='webli'
+        )
+        add_openclip_model(
+            model_id='ViT-B-16-SigLIP-i18n-256',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='webli'
+        )
+        add_openclip_model(
+            model_id='ViT-B-16-SigLIP-384',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='webli'
+        )
+        # add_openclip_model(
+        #     model_id='ViT-B-16-SigLIP-512',
+        #     category_list=category_list,
+        #     models_dict=models_dict,
+        #     pretrained='webli'
+        # )
+        add_openclip_model(
+            model_id='ViT-L-16-SigLIP-256',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='webli'
+        )
+        add_openclip_model(
+            model_id='ViT-L-16-SigLIP-384',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='webli'
+        )
+        add_openclip_model(
+            model_id='ViT-SO400M-14-SigLIP',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='webli'
+        )
+        add_openclip_model(
+            model_id='ViT-SO400M-14-SigLIP-384',
+            category_list=category_list,
+            models_dict=models_dict,
+            pretrained='webli'
+        )
 
 def main():
 
@@ -131,9 +395,19 @@ def main():
 
     separate_masks_base_dir = os.path.join(data_path, "separate_masks")
 
+    if args.dataset_name == "counter_animal_gap":
+        fg_detectors = ["oracle"]
+    elif args.dataset_name == "in_val_with_bboxes":
+        fg_detectors = ["oracle", "max_prob", "bbox_iou"]
+    else:
+        fg_detectors = ["oracle", "max_prob"]
+
     clean_dataloader_kwargs = {
         "clean_type": args.dataset_name,
     }
+
+    if args.siglip:
+        assert args.clip
 
     if args.dataset_name == "urban_cars":
 
@@ -144,24 +418,43 @@ def main():
             _parquet_kwargs["mapper"] = "urban_cars_clip"
         else:
             raise NotImplementedError("This function was not tested yet")
-            add_lle_model(
-                arch='resnet50',
-                models_dict=_models_dict,
-                ckpt_fpath="/home/oh/arubinstein17/github/Whac-A-Mole/exp/urbancars/lle_es_both_urbancars/seed_0/best.pth"
-            )
+            # add_lle_model(
+            #     arch='resnet50',
+            #     models_dict=_models_dict,
+            #     ckpt_fpath="/home/oh/arubinstein17/github/Whac-A-Mole/exp/urbancars/lle_es_both_urbancars/seed_0/best.pth"
+            # )
 
         parquets = {}
 
-        _df_path = os.path.join(parquets_base_dir, f"source_urban_cars_{args.mask_source}.parquet")
+        _df_path = os.path.join(parquets_base_dir, args.mask_source, f"source_urban_cars_{args.mask_source}.parquet")
 
-        _images_path = os.path.join(CACHE_PATH, "UrbanCars", "test")
+        _images_path = URBAN_CARS_PATH
         _masks_path = os.path.join(masks_base_dir, f"UrbanCars_test_masks_{args.mask_source}.pkl")
 
         _separate_masks_folder = os.path.join(separate_masks_base_dir, args.mask_source, "UrbanCars", "test")
         split_images_masks.append((args.dataset_name, _images_path, _masks_path, _separate_masks_folder))
         parquets[args.dataset_name] = (_df_path, _parquet_kwargs)
 
-    elif args.dataset_name == "counter_animal":
+    elif args.dataset_name == "in_val_with_bboxes":
+        if args.clip:
+
+            _category_list = get_in_classes_prompts()
+
+        else:
+            raise NotImplementedError()
+
+        clean_dataloader_kwargs["clean_type"] = "in_val"
+
+        _separate_masks_folder = os.path.join(separate_masks_base_dir, args.mask_source, "in_val_with_bboxes")
+        _images_path = "/mnt/lustre/datasets/ImageNet2012/val/"
+        _masks_path = os.path.join(masks_base_dir, f"in_val_masks_{args.mask_source}.pkl")
+        _bboxes_path = os.path.join(data_path, "bboxes_annotations", "val")
+        _masks_path = (_masks_path, _bboxes_path)
+        split_images_masks.append((args.dataset_name, _images_path, _masks_path, _separate_masks_folder))
+        _df_path = os.path.join(parquets_base_dir, args.mask_source, f"source_in_val_with_bboxes_{args.mask_source}.parquet")
+        parquets[args.dataset_name] = (_df_path, _parquet_kwargs)
+
+    elif args.dataset_name == "counter_animal" or args.dataset_name == "counter_animal_gap":
         _separate_masks_folder = os.path.join(separate_masks_base_dir, args.mask_source, "CounterAnimal")
         if args.clip:
 
@@ -181,7 +474,7 @@ def main():
 
             _masks_path = os.path.join(masks_base_dir, f"{split}_masks_{args.mask_source}.pkl")
             _separate_masks_folder = os.path.join(_separate_masks_folder, split)
-            _df_path = os.path.join(parquets_base_dir, f"source_counter_animal_{split}_{args.mask_source}.parquet")
+            _df_path = os.path.join(parquets_base_dir, args.mask_source, f"source_counter_animal_{split}_{args.mask_source}.parquet")
             parquets[split] = (_df_path, _parquet_kwargs)
             split_images_masks.append((split, _images_path, _masks_path, _separate_masks_folder))
 
@@ -192,18 +485,18 @@ def main():
         else:
             raise NotImplementedError()
 
-        for group_id in range(4):
+        for group_id in range(len(WATERBIRDS_PATHS)):
             parquet_name = f"waterbirds_group_{group_id}"
             parquets[parquet_name] = (
-                os.path.join(parquets_base_dir, f"source_waterbirds_group_{group_id}_{args.mask_source}.parquet"),
+                os.path.join(parquets_base_dir, args.mask_source, f"source_waterbirds_group_{group_id}_{args.mask_source}.parquet"),
                 _parquet_kwargs
             )
             split_images_masks.append(
                 (
                     parquet_name,
-                    os.path.join(CACHE_PATH, "Waterbirds", "test_split", f"group_{group_id}"),
+                    WATERBIRDS_PATHS[group_id],
                     os.path.join(masks_base_dir, f"Waterbirds_test_group{group_id}_masks_{args.mask_source}.pkl"),
-                    os.path.join(separate_masks_base_dir, "waterbirds", f"group_{group_id}")
+                    os.path.join(separate_masks_base_dir, args.mask_source, "waterbirds", f"group_{group_id}")
                 )
             )
 
@@ -220,13 +513,14 @@ def main():
         split_images_masks.append(
             (
                 parquet_name,
-                os.path.join(CACHE_PATH, "background_challenge", "bg_challenge", "mixed_rand", "val"),
+                # os.path.join(CACHE_PATH, "background_challenge", "bg_challenge", "mixed_rand", "val"),
+                IMAGENET_9_PATH,
                 os.path.join(masks_base_dir, f"ImageNet9_mixed_random_masks_{args.mask_source}.pkl"),
-                os.path.join(separate_masks_base_dir, "imagenet_9", "mixed_rand")
+                os.path.join(separate_masks_base_dir, args.mask_source, "imagenet_9", "mixed_rand")
             )
         )
         parquets[parquet_name] = (
-            os.path.join(parquets_base_dir, f"source_imagenet_9_mix_rand_{args.mask_source}.parquet"),
+            os.path.join(parquets_base_dir, args.mask_source, f"source_imagenet_9_mix_rand_{args.mask_source}.parquet"),
             _parquet_kwargs
         )
 
@@ -243,13 +537,22 @@ def main():
         split_images_masks.append(
             (
                 parquet_name,
-                (os.path.join(CACHE_PATH, "ImageNet-D", "ImageNet-D", "background"), {"to_map_labels": False}),
-                os.path.join(masks_base_dir, f"ImageNetD_masks_{args.mask_source}.pkl"),
-                os.path.join(separate_masks_base_dir, "imagenet_d", "background")
+                (IN_D_BG_PATH, {"to_map_labels": False}),
+                os.path.join(
+                    masks_base_dir,
+                    args.mask_source,
+                    f"IN_D_background_masks.pkl"
+                ),
+                os.path.join(
+                    separate_masks_base_dir,
+                    args.mask_source,
+                    "imagenet_d",
+                    "background"
+                )
             )
         )
         parquets[parquet_name] = (
-            os.path.join(parquets_base_dir, f"source_imagenet_d_bg_{args.mask_source}.parquet"),
+            os.path.join(parquets_base_dir, args.mask_source, f"source_imagenet_d_bg_{args.mask_source}.parquet"),
             _parquet_kwargs
         )
 
@@ -260,11 +563,24 @@ def main():
 
     if args.clip:
         assert _category_list is not None
-        add_clip_models(_models_dict, _category_list)
+        add_clip_models(
+            models_dict=_models_dict,
+            category_list=_category_list,
+            dataset_name=args.dataset_name,
+            siglip=args.siglip
+        )
 
     for split, images_path, masks_path, separate_masks_folder in split_images_masks:
 
-        assert os.path.exists(masks_path), f"masks path {masks_path} does not exist"
+        if isinstance(masks_path, tuple):
+            real_masks_path, real_bboxes_path = masks_path
+        else:
+            real_masks_path = masks_path
+            real_bboxes_path = None
+
+        assert os.path.exists(real_masks_path), f"masks path {real_masks_path} does not exist"
+        if real_bboxes_path is not None:
+            assert os.path.exists(real_bboxes_path), f"bboxes path {real_bboxes_path} does not exist"
 
         make_df_with_foreground_scores(
             source_df_path=parquets[split], # attention to mappers
@@ -272,7 +588,7 @@ def main():
             masks_path=masks_path,
             separate_masks_folder=separate_masks_folder,
             models_dict=_models_dict,
-            foreground_detectors=("oracle", "max_prob"),
+            foreground_detectors=fg_detectors,
             batch_size=args.batch_size,
             dataset_name=args.dataset_name,
             recompute_all=args.recompute_all
@@ -281,7 +597,7 @@ def main():
     eval_models(
         parquets=parquets,
         models=_models_dict,
-        fg_detectors=["oracle", "max_prob", None],
+        fg_detectors=fg_detectors + [None],
         full_res_save_path=args.result_path,
         batch_size=batch_size,
         clean_dataloader_kwargs=clean_dataloader_kwargs, # attention to mappers
@@ -304,7 +620,7 @@ def convert_to_table(result_path, dataset_name):
             df_dict[key] = [value["test_both_worst_group_acc"].item()]
         column_names = ["both_worst_group_acc"]
 
-    elif dataset_name in ["counter_animal", "imagenet_d", "imagenet_9"]:
+    elif dataset_name in ["counter_animal", "imagenet_d", "imagenet_9", "in_val_with_bboxes"]:
 
         df_dict = {key: [value] for key, value in res_dict.items()}
 
@@ -334,6 +650,30 @@ def convert_to_table(result_path, dataset_name):
                 df_dict[new_key] = [value]
 
         column_names = ["worst_group_acc"]
+
+    elif dataset_name == "counter_animal_gap":
+        df_dict = {}
+        for key, value in res_dict.items():
+            key_split = key.split(ENCODED_NAME_SEP)
+            assert len(key_split) == 3
+            model_id = key_split[-1]
+            fg_detector = key_split[1]
+            new_key = model_id
+            subset_type = key_split[0].replace("clean_", "")
+            col_name = f"{subset_type}{ENCODED_NAME_SEP}{fg_detector}"
+            cur_value = df_dict.get(new_key, {})
+            cur_value[col_name] = value
+            df_dict[new_key] = cur_value
+        for key, value in df_dict.items():
+            for fg_detector in ["oracle", "None"]:
+                common_key = f"common{ENCODED_NAME_SEP}{fg_detector}"
+                common_acc = value[common_key]
+                counter_key = f"counter{ENCODED_NAME_SEP}{fg_detector}"
+                counter_acc = value[counter_key]
+                gap_key = f"{fg_detector}{ENCODED_NAME_SEP}gap"
+                value[gap_key] = common_acc - counter_acc
+        pd.set_option('display.max_columns', None)
+
     else:
         raise_unknown("dataset_name", dataset_name, "")
 

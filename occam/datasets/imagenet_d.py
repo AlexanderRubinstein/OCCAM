@@ -10,11 +10,12 @@ import torchvision
 from datasets import load_dataset
 import PIL
 from stuned.utility.utils import (
-    show_images,
-    load_from_pickle,
-    append_dict,
-    get_project_root_path,
-    get_with_assert
+    # show_images,
+    # load_from_pickle,
+    # append_dict,
+    # get_project_root_path,
+    get_with_assert,
+    read_json
 )
 
 
@@ -24,9 +25,11 @@ sys.path.insert(
         os.path.dirname(os.path.dirname(__file__)), "src"
     )
 )
-from densifier.datasets.utils import (
+from occam.datasets.utils import (
     JSON_PATH,
-    get_collate_fn_in_d
+    DATASETS_PATH,
+    get_collate_fn_in_d,
+    make_mapping_dict_from_folder
 )
 sys.path.pop(0)
 
@@ -37,7 +40,7 @@ IMAGENET_D_SUBSETS = ['background', 'texture', 'material']
 #     "json"
 # )
 IMAGENET_D_ID_MAP_JSON = os.path.join(JSON_PATH, "imgnet_d2imgnet_id.json")
-
+IN_D_BG_PATH = os.path.join(DATASETS_PATH, "ImageNet-D", "background")
 
 # taken from: https://github.com/chenshuang-zhang/imagenet_d/blob/main/utils/data_loaders_imgnet_id.py#L6
 class ImageNetDLoader(torch.utils.data.Dataset):
@@ -125,10 +128,11 @@ class ImageNetDLoader(torch.utils.data.Dataset):
 
 
 def get_in_d_category_list():
-    with open(os.path.join(get_project_root_path(), 'json', 'imgnet_d_dir2imgnet_d_id.json')) as f:
-        category_mapping = json.load(f)
-        sorted_categories = sorted(category_mapping.values(), key=lambda value: value[0])
-        category_list = [convert_folder_name_to_category_name(value[1]) for value in sorted_categories]
+    # with open(os.path.join(get_project_root_path(), 'json', 'imgnet_d_dir2imgnet_d_id.json')) as f:
+    #     category_mapping = json.load(f)
+    category_mapping = read_json(os.path.join(JSON_PATH, "imgnet_d_dir2imgnet_d_id.json"))
+    sorted_categories = sorted(category_mapping.values(), key=lambda value: value[0])
+    category_list = [convert_folder_name_to_category_name(value[1]) for value in sorted_categories]
     id2category = {key: value for key, value in enumerate(category_list)}
     category2id = {value: key for key, value in id2category.items()}
     return category_list, id2category, category2id
@@ -196,3 +200,25 @@ def get_imagenet_d_dataloaders(
             collate_fn=get_collate_fn_in_d(drop_paths=True)
         )
     return ind_dataloaders
+
+
+def make_mapping_dict_imagenet_d(images_folder, masks_path, separate_masks_folder):
+    # path2label = make_path2label_imagenet_d(images_folder)
+    # path2label = make_path2label_counter_animal(images_folder)
+    dataset_kwargs = {}
+    if isinstance(images_folder, (list, tuple)):
+        images_folder, dataset_kwargs = images_folder
+    path2label = make_path2label_in_d(images_folder, **dataset_kwargs)
+    # path2label_counter = make_path2label_counter_animal("/home/oh/arubinstein17/github/densification/data/CounterAnimal/symlinked/counter_mislabeled_siglip")
+
+    # mapping_dict_counter = make_mapping_dict(
+
+    # TODO(Alex | 03.12.2024): rename func to more generic as it is not counter_animal specific
+    mapping_dict = make_mapping_dict_from_folder(
+        path2label=path2label,
+        masks_path=masks_path,
+        separate_masks_folder=separate_masks_folder,
+        bboxes_path=None,
+        # assert_shape=True
+    )
+    return mapping_dict

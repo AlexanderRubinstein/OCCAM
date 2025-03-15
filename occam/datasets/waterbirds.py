@@ -1,21 +1,21 @@
-import json
-import torch
-import h5py
+# import json
+# import torch
+# import h5py
 import os
 import sys
 # import torch
-import numpy as np
-import random
-import torchvision
-from datasets import load_dataset
-import PIL
-from stuned.utility.utils import (
-    show_images,
-    load_from_pickle,
-    append_dict,
-    get_project_root_path,
-    get_with_assert
-)
+# import numpy as np
+# import random
+# import torchvision
+# from datasets import load_dataset
+# import PIL
+# from stuned.utility.utils import (
+#     show_images,
+#     load_from_pickle,
+#     append_dict,
+#     get_project_root_path,
+#     get_with_assert
+# )
 
 
 sys.path.insert(
@@ -24,17 +24,25 @@ sys.path.insert(
         os.path.dirname(os.path.dirname(__file__)), "src"
     )
 )
-from densifier.datasets.utils import (
-    JSON_PATH,
-    get_collate_fn_in_d,
-    make_custom_folder_path2label
+from occam.datasets.utils import (
+    # JSON_PATH,
+    # get_collate_fn_in_d,
+    make_custom_folder_path2label,
+    make_mapping_dict_generic
 )
-from densifier.datasets.utils import (
+from occam.datasets.utils import (
+    DATASETS_PATH,
     make_to_classes_mapping,
     make_model_classes_wrapper,
     torch_max_func,
 )
 sys.path.pop(0)
+
+
+WATERBIRDS_PATHS = [
+    os.path.join(DATASETS_PATH, "Waterbirds", "test_split", f"group_{group_id}")
+        for group_id in range(4)
+]
 
 
 WATER_BIRDS_TYPES = [
@@ -117,3 +125,16 @@ def make_waterbirds_clip_mapper():
 
 def make_waterbirds_clip_wrapper(model):
     return make_model_classes_wrapper(model, make_waterbirds_clip_mapper)
+
+
+def make_mapping_dict_waterbirds(
+    images_folder,
+    masks_path,
+    separate_masks_folder
+):
+    return make_mapping_dict_generic(
+        images_folder,
+        masks_path,
+        separate_masks_folder,
+        path2label_func=make_path2label_waterbirds
+    )

@@ -21,6 +21,7 @@ from stuned.local_datasets.utils import (
 from stuned.local_datasets.imagenet1k import (
     DEFAULT_MEAN,
     DEFAULT_STD,
+    IMAGENET2012_CLASSES_LIST,
     get_imagenet_dataloaders
 )
 from stuned.local_datasets.transforms import (
@@ -35,16 +36,25 @@ sys.path.insert(
         get_project_root_path(), "src"
     )
 )
-import densifier
-from densifier.datasets.imagenet_classes import get_in_classes_prompts
-from densifier.utility.utils_for_notebooks import (
-    visualize_images_side_by_side,
-    tensor_for_matplotlib,
-    # unnormalize,
-    load_data
-)
-from densifier.datasets.bboxed_dataset import (
+# import densifier
+# from occam.datasets.imagenet_classes import get_in_classes_prompts
+# from occam.utility.utils_for_notebooks import (
+#     visualize_images_side_by_side,
+#     tensor_for_matplotlib,
+#     # unnormalize,
+#     load_data
+# )
+from occam.datasets.bboxed_dataset import (
     get_bboxed_dataloaders
+)
+from occam.datasets.utils import (
+    make_custom_folder_dataloader
+)
+from occam.datasets.imagenet_d import (
+    get_imagenet_d_dataloaders
+)
+from occam.datasets.imagenet_9 import (
+    get_imagenet_9_dataloaders
 )
 sys.path.pop(0)
 
@@ -326,3 +336,90 @@ def get_dataloaders(data_config, logger=None):
 #         DEFAULT_MEAN,
 #         DEFAULT_STD
 #     )
+
+
+def make_dataloader(
+    dataset_path,
+    transform,
+    batch_size=128,
+    num_workers=4,
+    return_path=False,
+    masks=None,
+    mask_transform=None,
+    dataloader_type="counter_animal",
+    **kwargs
+):
+    if (
+        dataloader_type == "counter_animal"
+        or
+            dataloader_type == "clean_counter"
+        or
+            dataloader_type == "clean_common"
+    ):
+        dataloader = make_custom_folder_dataloader(
+            dataset_path,
+            transform,
+            batch_size=batch_size,
+            num_workers=num_workers,
+            return_path=return_path,
+            masks=masks,
+            mask_transform=mask_transform
+        )
+    elif (
+            "waterbirds" in dataloader_type
+        or
+            dataloader_type == "urban_cars"
+        or
+            dataloader_type == "in_val"
+    ):
+        if "waterbirds" in dataloader_type:
+            assert "group" in dataloader_type # expect "waterbirds_group_<i>"
+
+        dataloader = make_custom_folder_dataloader(
+            dataset_path,
+            transform,
+            batch_size=batch_size,
+            num_workers=num_workers,
+            return_path=return_path,
+            # masks=None,
+            # mask_transform=None
+        )
+    elif dataloader_type == "imagenet_9":
+        dataset_config = {
+            "data_dir": dataset_path,
+            # "ind_types": ["background"]
+        }
+        dl, dl_name = get_imagenet_9_dataloaders(
+            eval_batch_size=batch_size,
+            dataset_config=dataset_config,
+            num_workers=num_workers,
+            eval_transform=transform,
+            # to_map_labels=kwargs.get("to_map_labels", True)
+        )
+        dataloader = dl
+    else:
+        assert dataloader_type == "imagenet_d_bg"
+        dataset_config = {
+            "data_dir": dataset_path,
+            "ind_types": ["background"]
+        }
+        dls = get_imagenet_d_dataloaders(
+            eval_batch_size=batch_size,
+            dataset_config=dataset_config,
+            num_workers=num_workers,
+            eval_transform=transform,
+            to_map_labels=kwargs.get("to_map_labels", True)
+        )
+        dataloader = dls["background"]
+
+    return dataloader
+
+
+def get_imagenet_prompts():
+    # imagenet_names = []
+    # for _ in open('imagenet_names.txt'):
+    #     name = _.split('\t')[-1].rstrip()
+    #     imagenet_names.append(name)
+
+    text = [f"A photo of {label[1]}" for label in IMAGENET2012_CLASSES_LIST]
+    return text

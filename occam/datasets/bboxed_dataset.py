@@ -1,4 +1,4 @@
-import wget
+# import wget
 import os
 import sys
 import shutil
@@ -54,28 +54,35 @@ sys.path.insert(
         os.path.dirname(os.path.abspath('')), "src"
     )
 )
-import densifier
-from densifier.datasets.utils import (
-    open_pil_image
-)
-from densifier.eval_clip.eval import (
-    apply_visual_prompts,
-    _build_timm_model,
-    is_background
-)
-from densifier.utility.utils_for_notebooks import (
-    make_symlink_cmd,
-    tensor_for_matplotlib,
+# import densifier
+from occam.datasets.utils import (
+    open_pil_image,
+    subpath,
     load_xml
 )
-from densifier.detection.uncertainty_scores import (
-    div_continous_unique_per_sample,
-    average_energy_per_sample,
-    ens_entropy_per_sample,
-    entropy,
-    ens_conf_per_sample,
-    get_probs
+# from occam.eval_clip.eval import (
+#     apply_visual_prompts,
+#     _build_timm_model,
+#     is_background ??
+# )
+from occam.robust_classification.masking import (
+    apply_visual_prompts,
+    # _build_timm_model,
+    is_background
 )
+# from occam.utility.utils_for_notebooks import (
+#     make_symlink_cmd,
+#     tensor_for_matplotlib,
+#     load_xml
+# )
+# from occam.detection.uncertainty_scores import (
+#     div_continous_unique_per_sample,
+#     average_energy_per_sample,
+#     ens_entropy_per_sample,
+#     entropy,
+#     ens_conf_per_sample,
+#     get_probs
+# )
 sys.path.pop(0)
 
 
@@ -144,6 +151,34 @@ def make_bbox(bbox_path, n_channels=3):
     bbox = torch.zeros((1, height, width))
     bbox[:, y_min:y_max, x_min:x_max] = 1
     return torch.cat([bbox] * n_channels, dim=0)
+
+
+# def compute_bbox_fit_score(mask, bbox, extended_output=False):
+
+#     # intersection = (mask * bbox).sum()
+#     # outside_bbox = (mask * (1 - bbox)).sum()
+#     # bbox_fit_score = intersection / max(1, outside_bbox)  # to filter out background
+#     mask_shape_len = len(mask.shape)
+#     assert mask.shape == bbox.shape
+#     if mask_shape_len == 4:
+#         mask = mask[0]
+#         bbox = bbox[0]
+#     assert mask_shape_len == 3
+
+#     # make sure that mask and bbox are binary even after transform with interpolation
+#     mask = mask == 1
+#     bbox = bbox == 1
+#     bbox_fit_score, intersection, union = iou(mask, bbox)
+
+#     bbox_fit_score = bbox_fit_score.mean().item()
+#     intersection = intersection.mean().item()
+#     union = union.mean().item()
+
+#     if extended_output:
+#         # return bbox_fit_score, intersection, outside_bbox
+#         return bbox_fit_score, intersection, union
+#     else:
+#         return bbox_fit_score
 
 
 def compute_bbox_fit_score(mask, bbox, extended_output=False):
@@ -748,8 +783,8 @@ def get_return_tuple(
     return return_tuple
 
 
-def subpath(path, k, sep=""):
-    return sep.join(path.split(os.sep)[-k:])
+# def subpath(path, k, sep=""):
+#     return sep.join(path.split(os.sep)[-k:])
 
 
 def pathprefix(path, k, sep=""):

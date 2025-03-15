@@ -7,27 +7,30 @@ from PIL import Image
 from typing import Any
 from torchvision.datasets import ImageFolder
 import torchvision
+import xml.etree.ElementTree as ET
+from tqdm import tqdm
+import pandas as pd
 
 
 from stuned.utility.utils import (
     get_project_root_path,
-    get_with_assert,
-    raise_unknown,
-    str_is_number
+    # get_with_assert,
+    # raise_unknown,
+    str_is_number,
+    load_from_pickle,
+    optionally_make_dir
 )
 from stuned.local_datasets.imagenet1k import (
     DEFAULT_MEAN,
     DEFAULT_STD,
-    get_imagenet_dataloaders
+    # get_imagenet_dataloaders
 )
 
 
 # local modules
 sys.path.insert(
     0,
-    os.path.join(
-        get_project_root_path(), "src"
-    )
+    get_project_root_path()
 )
 # import densifier
 import occam
@@ -41,13 +44,28 @@ import occam
 # from densifier.datasets.bboxed_dataset import (
 #     get_bboxed_dataloaders
 # )
+# from occam.datasets.bboxed_dataset import (
+#     make_bboxed_dataset_from_config,
+#     get_mask_id_prefix,
+#     make_bbox,
+#     compute_bbox_fit_score,
+#     subpath
+# )
 sys.path.pop(0)
 
 
 IMAGE_NORMALIZATION_CONST = 255
+DATA_PATH = os.path.join(
+    get_project_root_path(),
+    "data"
+)
 JSON_PATH = os.path.join(
     get_project_root_path(),
-    "json"
+    "jsons"
+)
+DATASETS_PATH = os.path.join(
+    DATA_PATH,
+    "datasets"
 )
 
 
@@ -405,3 +423,211 @@ def make_custom_folder_dataloader(
         batch_size=batch_size,
         num_workers=num_workers
     )
+
+
+def make_mapping_dict_generic_from_folder(
+    images_folder,
+    masks_path,
+    separate_masks_folder
+):
+    return make_mapping_dict_generic(
+        images_folder,
+        masks_path,
+        separate_masks_folder,
+        path2label_func=make_custom_folder_path2label
+    )
+
+
+def make_mapping_dict_generic(
+    images_folder, # can contain dataset_kwargs: (images_folder, dataset_kwargs)
+    masks_path, # can contain bboxes_path: (masks_path, bboxes_path)
+    separate_masks_folder,
+    path2label_func
+):
+    # path2label = make_path2label_imagenet_d(images_folder)
+    # path2label = make_path2label_counter_animal(images_folder)
+    dataset_kwargs = {}
+    if isinstance(images_folder, (list, tuple)):
+        images_folder, dataset_kwargs = images_folder
+    # path2label = make_path2label_in_d(images_folder, **dataset_kwargs)
+    path2label = path2label_func(images_folder)
+    # path2label_counter = make_path2label_counter_animal("/home/oh/arubinstein17/github/densification/data/CounterAnimal/symlinked/counter_mislabeled_siglip")
+
+    # mapping_dict_counter = make_mapping_dict(
+    if isinstance(masks_path, (list, tuple)):
+        masks_path, bboxes_path = masks_path
+
+    # TODO(Alex | 03.12.2024): rename func to more generic as it is not counter_animal specific
+    mapping_dict = make_mapping_dict_from_folder(
+        path2label=path2label,
+        masks_path=masks_path,
+        separate_masks_folder=separate_masks_folder,
+        bboxes_path=bboxes_path,
+        # assert_shape=True
+    )
+    return mapping_dict
+
+
+# mapping dict for CounterAnimal
+def make_mapping_dict_from_folder(
+    path2label,
+    masks_path,
+    separate_masks_folder,
+    bboxes_path,
+    assert_shape=False
+):
+    """
+    Generates a mapping dictionary linking image paths to corresponding mask paths, bounding box paths,
+    and labels. Optionally validates the shape consistency between images and masks.
+
+    Args:
+        path2label (list): A list of tuples where each tuple contains the path to an image and its corresponding label.
+        masks_path (str): Path to the pickle file containing preloaded masks.
+        separate_masks_folder (str): Directory to save the extracted and processed mask files.
+        bboxes_path (str or None): Path to bounding boxes information. If None, bounding boxes are not used.
+        assert_shape (bool, optional): If True, asserts that the image and mask shapes match. Defaults to False.
+
+    Returns:
+        dict: A dictionary where each key is an image path, and the value is a tuple containing:
+            - mask_path (str): Path to the saved mask file.
+            - bbox_path (str or None): Path to the bounding box information (or None if not applicable).
+            - label: Label associated with the image.
+
+    Raises:
+        AssertionError: If a mask corresponding to an image is not found in the preloaded masks or if `assert_shape`
+                        is True and the image and mask shapes do not match.
+        NotImplementedError: If `bboxes_path` is provided (functionality for handling bounding boxes is not implemented).
+    """
+    # def subpath(path, k):
+    #     return "".join(path.split(os.sep)[-k:])
+
+
+    def get_bbox_path(path, bboxes_folder):
+        if os.path.basename(bboxes_folder) == "val":
+            bboxes_type = "val"
+        else:
+            assert os.path.basename(bboxes_folder) == "Annotation", \
+                "train bboxes should be in Annotation folder"
+            bboxes_type = "train"
+
+        class_id = os.path.basename(os.path.dirname(path))
+        if bboxes_type == "val":
+            folder_path = bboxes_folder
+        else:
+            folder_path = os.path.join(bboxes_folder, class_id)
+        return os.path.join(folder_path, os.path.basename(path).replace(".JPEG", ".xml"))
+
+    res = {}
+    masks = load_from_pickle(masks_path)
+    renamed_masks = {}
+    for key, value in masks.items():
+        renamed_masks[subpath(key, 2)] = value
+
+    masks = renamed_masks
+    # assert bboxes_path is None, "Not implemented"
+    os.makedirs(separate_masks_folder, exist_ok=True)
+    for path, label in tqdm(path2label):
+        # mask_id = path[1:]
+        mask_id = subpath(path, 2)
+
+        # print(mask_id)
+        # print(masks.keys())
+
+        assert mask_id in masks
+        # key = path
+
+        mask = masks[mask_id]["mask"]
+
+        if assert_shape:
+            image = open_pil_image(path)
+            # print("image:", image.shape)
+            # print("mask:", mask.shape)
+
+            assert image.shape[:-1] == mask.shape
+
+        if bboxes_path is None:
+            bbox_path = None
+        else:
+            bbox_path = get_bbox_path(path, bboxes_path)
+            # assert False, "Not implemented"
+
+        mask_path = os.path.join(
+            separate_masks_folder,
+            # os.path.basename(path).split(".")[0] + ".mask"
+            make_mask_name_from_path(path)
+        )
+
+        torch.save(mask, mask_path)
+        res[path] = (mask_path, bbox_path, label)
+
+    return res
+
+
+def subpath(path, k, sep=""):
+    return sep.join(path.split(os.sep)[-k:])
+
+
+def load_xml(path_to_xml):
+    root = ET.parse(path_to_xml).getroot()
+    return root
+
+
+def make_mask_name_from_path(path):
+    return path.replace(os.sep, "@") + ".mask"
+
+
+def make_source_df(
+    mapping_dict
+):
+    res = {
+        'source_image_path': [],
+        'classification_label': [],
+        'image_to_label': [],
+        'main_object_label': [],
+        'mask_path': [],
+        'mask_value': [],
+        'bbox_path': [],
+        'metadata': []
+    }
+
+    for image_path, image_data in tqdm(mapping_dict.items()):
+
+        mask_path = image_data[0]
+        bbox_path = image_data[1]
+        image_label = image_data[2]
+
+        # assert bbox_path is None
+        assert mask_path is not None
+
+        # shape_mismatch_info = None
+        # mask_value_for_main_object = 0
+        main_object_label = 1
+        masks = torch.load(mask_path)
+
+        all_mask_values = np.unique(masks).tolist()
+        # metadata = {}
+
+        for mask_value in all_mask_values:
+
+            # metadata_key = str(mask_value)
+
+            res["source_image_path"].append(image_path)
+            res["classification_label"].append(image_label)
+            res["image_to_label"].append(None)
+            res["main_object_label"].append(main_object_label)
+            res["mask_path"].append(mask_path)
+            res["mask_value"].append(mask_value)
+            res["bbox_path"].append(bbox_path)
+            res["metadata"].append(None)
+
+        # if len(res["source_image_path"]) > 100:
+        #     break # tmp 2
+
+    # print("Shape mismatches:\n", shape_mismatches)
+    df = pd.DataFrame(res)
+    return df
+
+
+def to_parquet(df, path):
+    optionally_make_dir(path)
+    df.to_parquet(path)

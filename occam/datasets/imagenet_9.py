@@ -15,7 +15,8 @@ from stuned.utility.utils import (
     # append_dict,
     # get_project_root_path,
     get_with_assert,
-    read_json
+    read_json,
+    get_project_root_path
 )
 
 
@@ -32,20 +33,25 @@ IMAGENET_9_SUBSETS = ["mixed_rand"]
 
 sys.path.insert(
     0,
-    os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), "src"
-    )
+    get_project_root_path()
 )
-from densifier.datasets.utils import (
+from occam.datasets.utils import (
     JSON_PATH,
+    DATASETS_PATH,
     make_to_classes_mapping,
     make_model_classes_wrapper,
     get_collate_fn_in_d,
-    torch_max_func
+    torch_max_func,
+    make_mapping_dict_generic
 )
 sys.path.pop(0)
 
 
+IMAGENET_9_PATH = os.path.join(
+    DATASETS_PATH,
+    "mixed_rand",
+    "val"
+)
 IMAGENET_9_MAP_JSON = os.path.join(JSON_PATH, "in2in9.json")
 IN9_CATEGORIES = [
     "dog",
@@ -325,3 +331,33 @@ def get_imagenet_9_dataloaders(
     assert dataloader_name is not None
 
     return dataloader, dataloader_name
+
+
+def make_mapping_dict_imagenet_9(images_folder, masks_path, separate_masks_folder):
+    # # path2label = make_path2label_imagenet_d(images_folder)
+    # # path2label = make_path2label_counter_animal(images_folder)
+    # dataset_kwargs = {}
+    # if isinstance(images_folder, (list, tuple)):
+    #     images_folder, dataset_kwargs = images_folder
+    # # path2label = make_path2label_in_d(images_folder, **dataset_kwargs)
+    # path2label = make_path2label_in_9(images_folder)
+    # # path2label_counter = make_path2label_counter_animal("/home/oh/arubinstein17/github/densification/data/CounterAnimal/symlinked/counter_mislabeled_siglip")
+
+    # # mapping_dict_counter = make_mapping_dict(
+
+    # # TODO(Alex | 03.12.2024): rename func to more generic as it is not counter_animal specific
+    # mapping_dict = make_mapping_dict_counter_animal(
+    #     path2label=path2label,
+    #     masks_path=masks_path,
+    #     separate_masks_folder=separate_masks_folder,
+    #     bboxes_path=None,
+    #     # assert_shape=True
+    # )
+    # return mapping_dict
+    # TODO(Alex | 22.12.2024): check that it works with IN-9
+    return make_mapping_dict_generic(
+        images_folder,
+        masks_path,
+        separate_masks_folder,
+        path2label_func=make_path2label_in_9
+    )

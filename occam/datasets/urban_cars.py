@@ -3,23 +3,32 @@ import os
 import torch
 
 
+from stuned.utility.utils import (
+    get_project_root_path,
+)
+
 sys.path.insert(
     0,
-    os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), "src"
-    )
+    get_project_root_path()
 )
-from densifier.datasets.utils import (
-    JSON_PATH,
-    get_collate_fn_in_d,
-    make_custom_folder_path2label
-)
-from densifier.datasets.utils import (
+# from occam.datasets.utils import (
+#     JSON_PATH,
+#     get_collate_fn_in_d,
+#     make_custom_folder_path2label
+# )
+from occam.datasets.utils import (
+    DATASETS_PATH,
     make_to_classes_mapping,
     make_model_classes_wrapper,
     torch_max_func,
 )
 sys.path.pop(0)
+
+
+URBAN_CARS_PATH = os.path.join(DATASETS_PATH, "UrbanCars", "test")
+URBAN_CARS_BG_RATIO = 0.95
+URBAN_CARS_CO_OCCUR_OBJ_RATIO = 0.95
+URBAN_CARS_NUM_CLASS = 2
 
 
 CARS_CLASSES = [
@@ -255,3 +264,27 @@ def make_uc_clip_mapper():
 
 def make_uc_clip_wrapper(model):
     return make_model_classes_wrapper(model, make_uc_clip_mapper)
+
+
+def convert_urban_cars_label(label):
+    return decode_urban_cars_target(label)[:, 0] # decode and take only obj_label
+
+
+def decode_urban_cars_target(target):
+
+    # [obj_label, bg_label, obj_bg_co_occur_label], all labels are in [0, 1]
+    obj_label = target // 100  # Get third digit from right
+    bg_label = (target // 10) % 10  # Get second digit from right
+    co_occur_obj_label = target % 10  # Get first digit from right
+
+    return torch.stack([obj_label, bg_label, co_occur_obj_label], dim=1)
+
+
+def decode_urban_cars_target(target):
+
+    # [obj_label, bg_label, obj_bg_co_occur_label], all labels are in [0, 1]
+    obj_label = target // 100  # Get third digit from right
+    bg_label = (target // 10) % 10  # Get second digit from right
+    co_occur_obj_label = target % 10  # Get first digit from right
+
+    return torch.stack([obj_label, bg_label, co_occur_obj_label], dim=1)

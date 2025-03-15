@@ -1,29 +1,29 @@
-import wget
+# import wget
 import os
 import sys
-import shutil
+# import shutil
 import torch
 from tqdm import tqdm
-import xml.etree.ElementTree as ET
-import numpy as np
+# import xml.etree.ElementTree as ET
+# import numpy as np
+# import matplotlib.pyplot as plt
+# from sklearn.metrics import (
+    # PrecisionRecallDisplay,
+    # roc_auc_score,
+    # roc_curve
+# )
 import matplotlib.pyplot as plt
-from sklearn.metrics import (
-    PrecisionRecallDisplay,
-    roc_auc_score,
-    roc_curve
-)
-import matplotlib.pyplot as plt
-import pandas as pd
-from PIL import Image
-import open_clip
+# import pandas as pd
+# from PIL import Image
+# import open_clip
 from stuned.utility.utils import (
     get_project_root_path,
     load_from_pickle
 )
 from stuned.local_datasets.imagenet1k import (
     IMAGENET2012_CLASSES_LIST,
-    IMAGENET2012_CLASSES,
-    get_imagenet_dataloaders
+    # IMAGENET2012_CLASSES,
+    # get_imagenet_dataloaders
 )
 
 
@@ -33,39 +33,43 @@ sys.path.insert(
         get_project_root_path()
     )
 )
-import densifier
-from densifier.datasets.utils import (
+# import occam
+from occam.datasets.utils import (
     open_pil_image,
     make_custom_folder_path2label
 )
-from densifier.datasets.imagenet_classes import get_in_classes_prompts
-from densifier.datasets.bboxed_dataset import (
+from occam.datasets.imagenet_classes import get_in_classes_prompts
+from occam.datasets.bboxed_dataset import (
     make_bboxed_dataset_from_config,
     get_mask_id_prefix,
     make_bbox,
     compute_bbox_fit_score,
     subpath
 )
-from densifier.datasets.utils import (
-    make_to_classes_mapping,
+from occam.datasets.utils import (
+    DATASETS_PATH,
+    # make_to_classes_mapping,
     make_model_classes_wrapper,
-    torch_max_func,
+    # torch_max_func,
 )
-from densifier.eval_clip.eval import (
-    COUNTER_ANIMAL_CLASSES, # tmp - jsut sort and store here
-    IMAGE_NORMALIZATION_CONST,
-    # CustomImageFolder,
-    apply_visual_prompts,
-    _build_timm_model,
-    is_background,
-    make_dataloader,
-    get_imagenet_prompts,
-    get_text_probs
-)
+# from densifier.eval_clip.eval import (
+#     COUNTER_ANIMAL_CLASSES, # tmp - jsut sort and store here
+#     IMAGE_NORMALIZATION_CONST,
+#     # CustomImageFolder,
+#     apply_visual_prompts,
+#     _build_timm_model,
+#     is_background,
+#     make_dataloader,
+#     get_imagenet_prompts,
+#     get_text_probs
+# )
 sys.path.pop(0)
 
 
 COUNTER_ANIMAL_CLASSES_LIST = [9, 10, 16, 20, 23, 30, 33, 37, 39, 41, 42, 49, 54, 56, 57, 58, 70, 71, 76, 79, 80, 81, 83, 89, 100, 102, 128, 130, 133, 144, 150, 275, 276, 277, 279, 290, 291, 293, 296, 305, 316, 337, 349, 357, 360]
+COUNTER_ANIMAL_DATASET_PATH = os.path.join(DATASETS_PATH, "CounterAnimal")
+COUNTER_PATH = os.path.join(COUNTER_ANIMAL_DATASET_PATH, "counter")
+COMMON_PATH = os.path.join(COUNTER_ANIMAL_DATASET_PATH, "common")
 
 
 def make_path2label_counter_animal(dataset_path): # for counter animal
@@ -194,3 +198,18 @@ def make_counter_animal_clip_mapper():
 
 def make_counter_animal_clip_wrapper(model):
     return make_model_classes_wrapper(model, make_counter_animal_clip_mapper)
+
+
+def make_mapping_dict_counter_animal_(images_folder, masks_path, separate_masks_folder):
+    path2label = make_path2label_counter_animal(images_folder)
+    # path2label_counter = make_path2label_counter_animal("/home/oh/arubinstein17/github/densification/data/CounterAnimal/symlinked/counter_mislabeled_siglip")
+
+    # mapping_dict_counter = make_mapping_dict(
+    mapping_dict = make_mapping_dict_from_folder(
+        path2label=path2label,
+        masks_path=masks_path,
+        separate_masks_folder=separate_masks_folder,
+        bboxes_path=None,
+        # assert_shape=True
+    )
+    return mapping_dict
