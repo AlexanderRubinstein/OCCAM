@@ -42,7 +42,7 @@ from occam.robust_classification.models import (
     add_openclip_model
 )
 from occam.datasets.imagenet_d import (
-    IN_D_BG_PATH,
+    IN_D_PATH,
     get_in_d_category_list,
 )
 from occam.datasets.imagenet_classes import get_in_classes_prompts
@@ -537,7 +537,7 @@ def main():
         split_images_masks.append(
             (
                 parquet_name,
-                (IN_D_BG_PATH, {"to_map_labels": False}),
+                (IN_D_PATH, {"to_map_labels": False}),
                 os.path.join(
                     masks_base_dir,
                     args.mask_source,

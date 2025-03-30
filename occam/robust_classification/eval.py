@@ -37,7 +37,7 @@ from occam.datasets.waterbirds import (
     make_waterbirds_clip_wrapper
 )
 from occam.datasets.imagenet_d import (
-    IN_D_BG_PATH,
+    IN_D_PATH,
     make_mapping_dict_imagenet_d,
     # make_mapping_dict_imagenet_d_bg
 )
@@ -589,7 +589,7 @@ def eval_models(
 
     if clean_type == "imagenet_d_bg":
         # dataset_name_path_list = [("clean_in_d_bg", IN_D_PATH)]
-        dataset_name_path_list = [("imagenet_d_bg", (IN_D_BG_PATH, clean_dataloader_kwargs))]
+        dataset_name_path_list = [("imagenet_d_bg", (IN_D_PATH, clean_dataloader_kwargs))]
     elif clean_type == "in_val":
         raise NotImplementedError("In-val is not supported yet")
         # dataset_name_path_list = [("in_val", (IN_VAL_PATH, clean_dataloader_kwargs))]

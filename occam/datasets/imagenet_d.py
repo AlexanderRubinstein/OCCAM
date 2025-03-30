@@ -40,7 +40,8 @@ IMAGENET_D_SUBSETS = ['background', 'texture', 'material']
 #     "json"
 # )
 IMAGENET_D_ID_MAP_JSON = os.path.join(JSON_PATH, "imgnet_d2imgnet_id.json")
-IN_D_BG_PATH = os.path.join(DATASETS_PATH, "ImageNet-D", "background")
+IN_D_PATH = os.path.join(DATASETS_PATH, "ImageNet-D")
+
 
 # taken from: https://github.com/chenshuang-zhang/imagenet_d/blob/main/utils/data_loaders_imgnet_id.py#L6
 class ImageNetDLoader(torch.utils.data.Dataset):

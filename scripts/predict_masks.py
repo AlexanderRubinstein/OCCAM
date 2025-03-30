@@ -143,7 +143,7 @@ if __name__ == "__main__":
         assert args.confidence_threshold is None, \
             "confidence_threshold is not implemented for dino-ft"
 
-        assert len(args.opts) == 0, "opts should be empty for dino-ft"
+        # assert len(args.opts) == 0, "opts should be empty for dino-ft"
 
         model = load_model(args.model_id)
         preproc = build_dinosaur.build_preprocessing(args.model_id)
