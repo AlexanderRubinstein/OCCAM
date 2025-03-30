@@ -30,6 +30,8 @@ from occam.datasets.imagenet_9 import (
     make_in9_wrapper,
 )
 from occam.datasets.waterbirds import (
+    WATERBIRDS_PATHS,
+    WATERBIRDS_ONLY_FG_PATHS,
     make_mapping_dict_waterbirds,
     make_waterbirds_clip_wrapper,
 )
@@ -518,7 +520,7 @@ def compute_ens_entropy(model_outputs):
     #         stacked_logits = torch.cat([stacked_logits, logits.unsqueeze(0)], dim=0)
     # stacked_logits = torch.cat(model_outputs, dim=0)
     # return entropy(stacked_logits).item()
-    raise NotImplementedError("Does 1 - ens_entropy help?")
+    # raise NotImplementedError("Does 1 - ens_entropy help?")
     return 1 - ens_entropy_per_sample(model_outputs).item()
 
 
@@ -663,17 +665,34 @@ def eval_models(
         # dataset_name_path_list = [("urban_cars", (URBAN_CARS_PATH, clean_dataloader_kwargs))]
         # eval_mode = "urban_cars"
     elif clean_type == "waterbirds":
-        raise NotImplementedError("Waterbirds are not supported yet")
+        # raise NotImplementedError("Waterbirds are not supported yet")
+        standard_wb_group_paths = [
+            (
+                f"waterbirds_group_{group_id}",
+                (WATERBIRDS_PATHS[group_id], clean_dataloader_kwargs),
+            )
+            for group_id in range(len(WATERBIRDS_PATHS))
+        ]
+        only_fg_wb_group_paths = [
+            (
+                f"waterbirds_group_{group_id}_only_fg",
+                (WATERBIRDS_ONLY_FG_PATHS[group_id], clean_dataloader_kwargs),
+            )
+            for group_id in range(len(WATERBIRDS_ONLY_FG_PATHS))
+        ]
+        dataset_name_path_list = (
+            standard_wb_group_paths + only_fg_wb_group_paths
+        )
         # dataset_name_path_list = [
         #     ("waterbirds_group_0", (WB_GROUP_0_PATH, clean_dataloader_kwargs)),
         #     ("waterbirds_group_1", (WB_GROUP_1_PATH, clean_dataloader_kwargs)),
         #     ("waterbirds_group_2", (WB_GROUP_2_PATH, clean_dataloader_kwargs)),
         #     ("waterbirds_group_3", (WB_GROUP_3_PATH, clean_dataloader_kwargs)),
         # # fg
-        # ("waterbirds_group_0_only_fg", (WB_GROUP_0_ONLY_FG_PATH, clean_dataloader_kwargs)),
-        # ("waterbirds_group_1_only_fg", (WB_GROUP_1_ONLY_FG_PATH, clean_dataloader_kwargs)),
-        # ("waterbirds_group_2_only_fg", (WB_GROUP_2_ONLY_FG_PATH, clean_dataloader_kwargs)),
-        # ("waterbirds_group_3_only_fg", (WB_GROUP_3_ONLY_FG_PATH, clean_dataloader_kwargs)),
+        #     ("waterbirds_group_0_only_fg", (WB_GROUP_0_ONLY_FG_PATH, clean_dataloader_kwargs)),
+        #     ("waterbirds_group_1_only_fg", (WB_GROUP_1_ONLY_FG_PATH, clean_dataloader_kwargs)),
+        #     ("waterbirds_group_2_only_fg", (WB_GROUP_2_ONLY_FG_PATH, clean_dataloader_kwargs)),
+        #     ("waterbirds_group_3_only_fg", (WB_GROUP_3_ONLY_FG_PATH, clean_dataloader_kwargs)),
         # # bg
         # ("waterbirds_group_0_only_bg", (WB_GROUP_0_ONLY_BG_PATH, clean_dataloader_kwargs)),
         # ("waterbirds_group_1_only_bg", (WB_GROUP_1_ONLY_BG_PATH, clean_dataloader_kwargs)),
@@ -777,9 +796,7 @@ def eval_models(
                         eval_transform=transform_config,
                     )
 
-                    full_keyword = (
-                        f"{parquet_name}{ENCODED_NAME_SEP}{fg_keyword}"
-                    )
+                    full_keyword = f"{parquet_name}_{fg_keyword}@detector_{model_name}@model"
                     # if apply_mask:
                     #     images_extractor = None
                     # else:

@@ -79,6 +79,9 @@ from stuned.utility.utils import (
 )
 
 
+MAX_COL_WIDTH = 1000
+
+
 def get_parser():
     parser = argparse.ArgumentParser(
         description="add background scores and eval on spurious backgrounds datasets"
@@ -690,6 +693,7 @@ def main():
     )
 
     df = convert_to_table(args.result_path, args.dataset_name)
+    pd.set_option("display.max_colwidth", MAX_COL_WIDTH)
     print(df)
 
 
