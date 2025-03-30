@@ -4,53 +4,36 @@ import torch
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import argparse
-from sklearn.metrics import (
-    PrecisionRecallDisplay,
-    roc_auc_score,
-    roc_curve
-)
+from sklearn.metrics import PrecisionRecallDisplay, roc_auc_score, roc_curve
+
 # import scikitplot as skplt
 import matplotlib.pyplot as plt
+
 # import einops
-from stuned.utility.utils import (
-    get_project_root_path,
-    load_from_pickle
-)
+from stuned.utility.utils import get_project_root_path, load_from_pickle
 
 
 sys.path.insert(
-    0,
-    os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), "src"
-    )
+    0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src")
 )
-import densifier # for setting the variable with project root
-sys.path.insert(
-    0,
-    os.path.join(
-        get_project_root_path(), "notebooks"
-    )
-)
-from debiasing import (
-    make_models,
-    get_uncertainty_score,
-    optionally_make_dir
-)
+import densifier  # for setting the variable with project root
+
+sys.path.insert(0, os.path.join(get_project_root_path(), "notebooks"))
+from debiasing import make_models, get_uncertainty_score, optionally_make_dir
+
 sys.path.pop(0)
 import densifier
-from densifier.datasets.bboxed_dataset import (
-    make_bboxed_dataset_from_config
-)
+from densifier.datasets.bboxed_dataset import make_bboxed_dataset_from_config
 from densifier.eval_clip.eval import (
     add_openai_clip_model,
     add_alpha_clip_model,
-    add_openclip_model
+    add_openclip_model,
 )
 from densifier.datasets.imagenet_classes import get_in_classes_prompts
 from densifier.eval_clip.eval import (
     apply_visual_prompts,
     _build_timm_model,
-    is_background
+    is_background,
 )
 from densifier.utility.utils_for_notebooks import (
     # visualize_images_side_by_side,
@@ -61,7 +44,7 @@ from densifier.utility.utils_for_notebooks import (
     tensor_for_matplotlib,
     # unnormalize,
     show_in_rows,
-    batch_elements
+    batch_elements,
 )
 from densifier.detection.uncertainty_scores import (
     div_continous_unique_per_sample,
@@ -69,12 +52,9 @@ from densifier.detection.uncertainty_scores import (
     ens_entropy_per_sample,
     entropy,
     ens_conf_per_sample,
-    get_probs
+    get_probs,
 )
-# from densifier.datasets.common import (
-#     # DEFAULT_MEAN,
-#     # DEFAULT_STD
-# ) ??
+
 sys.path.pop(0)
 
 # from stuned.local_datasets.transforms import (
@@ -83,25 +63,18 @@ sys.path.pop(0)
 #     make_transforms
 # )
 
-from stuned.utility.utils import (
-    show_images,
-    load_from_pickle,
-    append_dict
-)
-from stuned.local_datasets.imagenet1k import (
-    get_imagenet_dataset
-)
+from stuned.utility.utils import show_images, load_from_pickle, append_dict
+from stuned.local_datasets.imagenet1k import get_imagenet_dataset
 from stuned.local_datasets.transforms import (
     DEFAULT_RESIZE_IN,
     DEFAULT_SIZE_IN,
     make_transforms,
     make_default_test_transforms_imagenet,
-    make_default_train_transforms_imagenet
+    make_default_train_transforms_imagenet,
 )
 
-CUR_DIR = os.path.abspath('')
+CUR_DIR = os.path.abspath("")
 DATA_PATH = os.path.join(os.path.dirname(CUR_DIR), "data")
-# ?? import from datasets.common
 
 # DEFAULT_MEAN = [0.485, 0.456, 0.406]
 # DEFAULT_STD = [0.229, 0.224, 0.225]
@@ -121,13 +94,17 @@ def plot_multiple_pr_curves(labels_scores, title, pr=True):
             if i + 1 == len(labels_scores):
                 plot_chance_level = True
             display = PrecisionRecallDisplay.from_predictions(
-                labels, scores, name=name, ax=ax, plot_chance_level=plot_chance_level
+                labels,
+                scores,
+                name=name,
+                ax=ax,
+                plot_chance_level=plot_chance_level,
             )
             i += 1
         else:
             # skplt.metrics.plot_roc_curve(labels, scores)
             # # plt.show()
-            fpr, tpr, _ = roc_curve(labels,  scores)
+            fpr, tpr, _ = roc_curve(labels, scores)
             # auc = metrics.roc_auc_score(y_test, y_pred_proba)
             # plt.plot(fpr, tpr, label=name)
             ax.plot(fpr, tpr, label=name)
@@ -139,8 +116,9 @@ def plot_multiple_pr_curves(labels_scores, title, pr=True):
     plt.show()
 
 
-def eval_model_list_on_dataloader(model_list, dataloader, device, max_samples=None):
-
+def eval_model_list_on_dataloader(
+    model_list, dataloader, device, max_samples=None
+):
     res = {}
     res["is_main_object"] = []
 
@@ -174,7 +152,6 @@ def eval_model_list_on_dataloader(model_list, dataloader, device, max_samples=No
 
 # TODO(Alex | 23.09.2024): do this batchwise
 def compute_unc(res, label_key):
-
     unc_scores = {}
 
     model_ids = []
@@ -194,44 +171,66 @@ def compute_unc(res, label_key):
             append_dict(
                 unc_scores,
                 {model_id: {"conf": get_probs(logits).max().item()}},
-                allow_new_keys=True
+                allow_new_keys=True,
             )
             # print(unc_scores)
             append_dict(
                 unc_scores,
                 {model_id: {"entropy": [entropy(logits).item()]}},
-                allow_new_keys=True
+                allow_new_keys=True,
             )
-            # print(unc_scores)
-            # unc_scores[model_id]["conf"].append??
-            # unc_scores[model_id]["entropy"] = entropy(logits).item()
+
             if stacked_logits is None:
                 stacked_logits = logits.unsqueeze(0)
             else:
-                stacked_logits = torch.cat([stacked_logits, logits.unsqueeze(0)], dim=0)
+                stacked_logits = torch.cat(
+                    [stacked_logits, logits.unsqueeze(0)], dim=0
+                )
         append_dict(
             unc_scores,
-            {"ensemble": {"PDS": [1 - div_continous_unique_per_sample(stacked_logits).item()]}},
-            allow_new_keys=True
+            {
+                "ensemble": {
+                    "PDS": [
+                        1
+                        - div_continous_unique_per_sample(stacked_logits).item()
+                    ]
+                }
+            },
+            allow_new_keys=True,
         )
         append_dict(
             unc_scores,
-            {"ensemble": {"energy": [1 - average_energy_per_sample(stacked_logits).item()]}},
-            allow_new_keys=True
+            {
+                "ensemble": {
+                    "energy": [
+                        1 - average_energy_per_sample(stacked_logits).item()
+                    ]
+                }
+            },
+            allow_new_keys=True,
         )
         append_dict(
             unc_scores,
-            {"ensemble": {"ens_ent": [1 - ens_entropy_per_sample(stacked_logits).item()]}},
-            allow_new_keys=True
+            {
+                "ensemble": {
+                    "ens_ent": [
+                        1 - ens_entropy_per_sample(stacked_logits).item()
+                    ]
+                }
+            },
+            allow_new_keys=True,
         )
         append_dict(
             unc_scores,
-            {"ensemble": {"ens_conf": [ens_conf_per_sample(stacked_logits).item()]}},
-            allow_new_keys=True
+            {
+                "ensemble": {
+                    "ens_conf": [ens_conf_per_sample(stacked_logits).item()]
+                }
+            },
+            allow_new_keys=True,
         )
         # average_energy_per_sample
         # unc_scores["PDS"] = div_continous_unique_per_sample(stacked_logits).item()
-    # ??
     return unc_scores
 
 
@@ -241,7 +240,7 @@ def get_parser():
         "--result_path",
         # default="/home/oh/arubinstein17/github/densification/data/results/for_runner_eval_uc.pth",
         # default="/home/oh/arubinstein17/github/densification/data/results/uncertainty_scores/5models_ensemble.pkl",
-        help="where to save the results"
+        help="where to save the results",
     )
     # parser.add_argument(
     #     "--recompute_all",
@@ -258,11 +257,7 @@ def get_parser():
     #     action="store_true",
     #     help="use clip"
     # )
-    parser.add_argument(
-        "--clips",
-        action="store_true",
-        help="use clip models"
-    )
+    parser.add_argument("--clips", action="store_true", help="use clip models")
     # parser.add_argument(
     #     "--batch_size",
     #     type=int,
@@ -279,7 +274,6 @@ def get_parser():
 
 
 def main():
-
     args = get_parser().parse_args()
 
     # model
@@ -322,6 +316,9 @@ def main():
     # ('ViT-L-14-CLIPA', 'datacomp1b')
     # ('ViT-L-14-CLIPA-336', 'datacomp1b')
     if args.clips:
+        raise NotImplementedError(
+            "use make_clip_ensemble instead of the code below"
+        )
         models_dict = {}
         category_list = get_in_classes_prompts()
         # add_openai_clip_model('ViT-L/14', category_list, models_dict)
@@ -338,10 +335,10 @@ def main():
         #     pretrained='laion400m_e32'
         # )
         add_openclip_model(
-            model_id='ViT-L-14',
+            model_id="ViT-L-14",
             category_list=category_list,
             models_dict=models_dict,
-            pretrained='datacomp_xl_s13b_b90k'
+            pretrained="datacomp_xl_s13b_b90k",
         )
         # add_openclip_model(
         #     model_id='ViT-L-14',
@@ -350,22 +347,22 @@ def main():
         #     pretrained='laion2b_s32b_b82k'
         # ) # has normalize 0.5, 0.5, 0.5
         add_openclip_model(
-            model_id='ViT-L-14-quickgelu',
+            model_id="ViT-L-14-quickgelu",
             category_list=category_list,
             models_dict=models_dict,
-            pretrained='dfn2b'
+            pretrained="dfn2b",
         )
         add_openclip_model(
-            model_id='ViT-L-14',
+            model_id="ViT-L-14",
             category_list=category_list,
             models_dict=models_dict,
-            pretrained='openai'
+            pretrained="openai",
         )
         add_openclip_model(
-            model_id='ViT-L-14',
+            model_id="ViT-L-14",
             category_list=category_list,
             models_dict=models_dict,
-            pretrained='laion400m_e31'
+            pretrained="laion400m_e31",
         )
         # add_openclip_model(
         #     model_id='ViT-L-14',
@@ -374,10 +371,10 @@ def main():
         #     pretrained='laion400m_e31'
         # )
         add_openclip_model(
-            model_id='ViT-L-14',
+            model_id="ViT-L-14",
             category_list=category_list,
             models_dict=models_dict,
-            pretrained='laion400m_e32'
+            pretrained="laion400m_e32",
         )
 
         # final model name: clip_openclip_<pretrained>_ + <model_id>
@@ -393,16 +390,18 @@ def main():
                 transform = preprocess
             else:
                 # or at least normalization and cropping the same?
-                assert str(transform) == str(preprocess), "transforms must be the same"
+                assert str(transform) == str(
+                    preprocess
+                ), "transforms must be the same"
             model_list.append((model_id, model))
     else:
         model_list = make_models(
             [
-                'resnet50.a1_in1k',
-                'resnet18.a1_in1k',
-                'vit_base_patch8_224.augreg2_in21k_ft_in1k',
-                'tf_efficientnet_b1.ns_jft_in1k',
-                'efficientnet_lite0.ra_in1k'
+                "resnet50.a1_in1k",
+                "resnet18.a1_in1k",
+                "vit_base_patch8_224.augreg2_in21k_ft_in1k",
+                "tf_efficientnet_b1.ns_jft_in1k",
+                "efficientnet_lite0.ra_in1k",
             ]
         )
 
@@ -410,7 +409,6 @@ def main():
         transform = make_default_test_transforms_imagenet()
 
     bboxed_dataset_config = {
-
         "csv_path": "/mnt/lustre/work/oh/arubinstein17/github/densification/data/csvs/cropformer/source_in_val_with_bboxes_cropformer.parquet",
         #   "csv_path": "/home/oh/arubinstein17/github/densification/data/csvs/cropformer/source_urban_cars_cropformer.parquet", # to speed up debug
         # csv_path: /home/oh/arubinstein17/github/densification/data/csvs/counter_debug.parquet
@@ -418,13 +416,12 @@ def main():
         "eval_transform": transform,
         "train_transform": None,
         "train_val_split": 0.0,
-        "foreground_keyword": "bbox_iou" # is_main_object is decided based on bbox_iou
-            # "foreground_keyword": "oracle---alpha_clip_ViT-L/14" # for faster debug
+        "foreground_keyword": "bbox_iou"  # is_main_object is decided based on bbox_iou
+        # "foreground_keyword": "oracle---alpha_clip_ViT-L/14" # for faster debug
     }
 
     bboxed_dataset = make_bboxed_dataset_from_config(
-        bboxed_dataset_config=bboxed_dataset_config,
-        transform_type="eval"
+        bboxed_dataset_config=bboxed_dataset_config, transform_type="eval"
     )
     # 3m30s when loading in_val data
     # if False:

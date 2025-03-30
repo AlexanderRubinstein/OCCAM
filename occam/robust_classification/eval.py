@@ -10,7 +10,7 @@ import numpy as np
 from stuned.utility.utils import (
     get_project_root_path,
     raise_unknown,
-    optionally_make_dir
+    optionally_make_dir,
 )
 from stuned.local_datasets.transforms import (
     # DEFAULT_RESIZE_IN,
@@ -20,21 +20,18 @@ from stuned.local_datasets.transforms import (
 )
 
 
-sys.path.insert(
-    0,
-    get_project_root_path()
-)
+sys.path.insert(0, get_project_root_path())
 from occam.datasets.counter_animal import (
     make_mapping_dict_counter_animal_,
-    make_counter_animal_clip_wrapper
+    make_counter_animal_clip_wrapper,
 )
 from occam.datasets.imagenet_9 import (
     make_mapping_dict_imagenet_9,
-    make_in9_wrapper
+    make_in9_wrapper,
 )
 from occam.datasets.waterbirds import (
     make_mapping_dict_waterbirds,
-    make_waterbirds_clip_wrapper
+    make_waterbirds_clip_wrapper,
 )
 from occam.datasets.imagenet_d import (
     IN_D_PATH,
@@ -48,23 +45,24 @@ from occam.datasets.urban_cars import (
     URBAN_CARS_NUM_CLASS,
     convert_urban_cars_label,
     make_uc_clip_wrapper,
-    decode_urban_cars_target
+    decode_urban_cars_target,
 )
 from occam.datasets.utils import (
     make_mapping_dict_generic_from_folder,
     make_source_df,
-    to_parquet
+    to_parquet,
 )
 from occam.datasets.bboxed_dataset import (
     make_bbox_dl_from_csv,
-    compute_bbox_fit_score
+    compute_bbox_fit_score,
 )
-from occam.robust_classification.utils import (
-    get_probs
+from occam.robust_classification.utils import get_probs
+from occam.datasets.common import make_dataloader
+from occam.robust_classification.models import ClipEnsemble, make_clip_ensemble
+from occam.ood_detection.uncertainty_scores import (
+    ens_entropy_per_sample,
 )
-from occam.datasets.common import (
-    make_dataloader
-)
+
 # from occam.datasets.imagenet_classes import (
 #     get_in_classes_prompts
 # )
@@ -78,38 +76,23 @@ EVAL_TRANSFORM_APPLIED_MASK_CONFIG = {
         "from_class-ToTensor",
         "from_class-Resize",
         "from_class-CenterCrop",
-        "from_class-Normalize"
+        "from_class-Normalize",
     ],
     "from_class-Normalize": {
         "class": "torchvision.transforms.Normalize",
-        "kwargs": {
-            "std": [
-                0.229,
-                0.224,
-                0.225
-            ],
-            "mean": [
-                0.485,
-                0.456,
-                0.406
-            ]
-        }
+        "kwargs": {"std": [0.229, 0.224, 0.225], "mean": [0.485, 0.456, 0.406]},
     },
-    "from_class-ToTensor": {
-        "class": "torchvision.transforms.ToTensor"
-    },
+    "from_class-ToTensor": {"class": "torchvision.transforms.ToTensor"},
     "from_class-CenterCrop": {
         "class": "torchvision.transforms.CenterCrop",
-        "kwargs": {
-            "size": 224
-        }
+        "kwargs": {"size": 224},
     },
     "from_class-Resize": {
         "class": "torchvision.transforms.Resize",
         "kwargs": {
-            "size": 224 # important to keep the size as mask is already resized to the full image size during applying
-        }
-    }
+            "size": 224  # important to keep the size as mask is already resized to the full image size during applying
+        },
+    },
 }
 ROUND_DECIMALS = 3
 
@@ -130,9 +113,8 @@ def make_df_with_foreground_scores(
     dataset_name="counter_animal",
     batch_size=128,
     num_workers=12,
-    recompute_all=False
+    recompute_all=False,
 ):
-
     # counter
     # counter_source_df_path = "/home/oh/arubinstein17/github/densification/data/csvs/source_counter.parquet"
     # make_source_df(
@@ -162,14 +144,16 @@ def make_df_with_foreground_scores(
         elif dataset_name == "in_val_with_bboxes":
             make_mapping_dict_func = make_mapping_dict_generic_from_folder
         else:
-            assert dataset_name == "imagenet_d" # it was renamed from imagenet-d to imagenet_d for consistency
+            assert (
+                dataset_name == "imagenet_d"
+            )  # it was renamed from imagenet-d to imagenet_d for consistency
             make_mapping_dict_func = make_mapping_dict_imagenet_d
         make_source_df_per_dataset(
             images_path=images_path,
             masks_path=masks_path,
             separate_masks_folder=separate_masks_folder,
             source_df_path=source_df_path,
-            make_mapping_dict_func=make_mapping_dict_func
+            make_mapping_dict_func=make_mapping_dict_func,
         )
     else:
         print(f"Source df already exists: {source_df_path}")
@@ -186,11 +170,11 @@ def make_df_with_foreground_scores(
             foreground_detectors,
             model_name,
             models_dict,
-            device='cuda',
+            device="cuda",
             batch_size=batch_size,
             num_workers=num_workers,
             convert_label=convert_label,
-            recompute_all=recompute_all
+            recompute_all=recompute_all,
         )
 
 
@@ -199,25 +183,22 @@ def make_source_df_per_dataset(
     masks_path,
     separate_masks_folder,
     source_df_path,
-    make_mapping_dict_func=make_mapping_dict_counter_animal_
+    make_mapping_dict_func=make_mapping_dict_counter_animal_,
 ):
     print("making mapping dict")
     mapping_dict = make_mapping_dict_func(
-        images_path,
-        masks_path,
-        separate_masks_folder
+        images_path, masks_path, separate_masks_folder
     )
     print("making source df")
-    source_df = make_source_df(
-        mapping_dict
-    )
+    source_df = make_source_df(mapping_dict)
     extracted_source_df_path = extract_el_if_tuple(source_df_path, i=0)
     to_parquet(source_df, extracted_source_df_path)
 
 
 def make_keyword(foreground_detector, model_name):
     keyword = f"{foreground_detector}"
-    if not foreground_detector == "bbox_iou":
+    # if not foreground_detector == "bbox_iou":
+    if not foreground_detector in ("bbox_iou", "ens_entropy"):
         keyword += f"{ENCODED_NAME_SEP}{model_name}"
     label_key = f"{keyword}_label"
     metadata_key = f"{keyword}_metadata"
@@ -229,13 +210,12 @@ def add_foreground_score(
     foreground_detectors,
     model_name,
     models_dict,
-    device='cuda',
+    device="cuda",
     batch_size=128,
     num_workers=12,
     convert_label=None,
-    recompute_all=False
+    recompute_all=False,
 ):
-
     # df = source_df.copy()
     # extracted_source_df_path = extract_el_if_tuple(source_df_path, i=0)
     # df = pd.read_parquet(extracted_source_df_path) # TODO(Alex | 09.11.2024) - don't read df twice, take it from dataset.csv
@@ -252,10 +232,16 @@ def add_foreground_score(
     # else:
     #     transform = EVAL_TRANSFORM_APPLIED_MASK_CONFIG
 
-    model, apply_mask, transform = check_model_specific_options(model, model_name)
+    model, apply_mask, transform = check_model_specific_options(
+        model, model_name
+    )
 
-    model, original_model, source_df_path = apply_dataset_specific_options(model, source_df_path)
-    df = pd.read_parquet(source_df_path) # TODO(Alex | 09.11.2024) - don't read df twice, take it from dataset.csv
+    model, original_model, source_df_path = apply_dataset_specific_options(
+        model, source_df_path
+    )
+    df = pd.read_parquet(
+        source_df_path
+    )  # TODO(Alex | 09.11.2024) - don't read df twice, take it from dataset.csv
 
     print(
         f"Adding foreground scores for {model_name} and detectors=({foreground_detectors})\n df: {source_df_path}"
@@ -274,17 +260,29 @@ def add_foreground_score(
         # batch_size=1, # to avoid stacking issues for different sizes
         num_workers=num_workers,
         eval_transform=transform,
-        apply_mask=apply_mask
+        apply_mask=apply_mask,
     )
     res_per_fg_score = {}
-    foreground_detectors_to_process = [] # to avoid running eval for fg_detectors that are already in df
+    foreground_detectors_to_process = (
+        []
+    )  # to avoid running eval for fg_detectors that are already in df
+    # uncertainty_estimators_dict = None
     for fg_detector in foreground_detectors:
         keyword, label_key, metadata_key = make_keyword(fg_detector, model_name)
+
+        # if fg_detector == "ens_entropy" and not isinstance(model, ClipEnsemble):
+        #     continue
+
+        # if fg_detector != "ens_entropy" and isinstance(model, ClipEnsemble):
+        #     continue
+
+        if (fg_detector == "ens_entropy") != isinstance(model, ClipEnsemble):
+            continue
+
         # don't run eval if already in parquet
         if (
-                metadata_key in df.columns
-            and
-                not df[metadata_key].isnull().values.any()
+            metadata_key in df.columns
+            and not df[metadata_key].isnull().values.any()
         ):
             if recompute_all:
                 df.drop(columns=[metadata_key, label_key], inplace=True)
@@ -296,8 +294,10 @@ def add_foreground_score(
             "source_image_path": [],
             "mask_value": [],
             "score_for_label": [],
-            metadata_key: []
+            metadata_key: [],
         }
+        # if fg_detector == "ens_entropy":
+        #     uncertainty_estimators_dict[fg_detector] =
 
     if len(res_per_fg_score) == 0:
         return
@@ -320,7 +320,7 @@ def add_foreground_score(
             image_path,
             all_masks,
             # intersection_info
-            metadata
+            metadata,
         ) = batch
 
         # e.g. for urban cars, when we need to convert [obj_label, bg_label and co-occur_label] to obj_label
@@ -330,14 +330,16 @@ def add_foreground_score(
         batch_size = len(idx)
 
         # applied_mask = applied_mask.to(image.dtype)
-        if not isinstance(applied_mask, (list, tuple)): # do nothing when mask is not applied yet
+        if not isinstance(
+            applied_mask, (list, tuple)
+        ):  # do nothing when mask is not applied yet
             # applied_mask = applied_mask.float() # changed to convert in bboxed_dataset.py
             applied_mask = applied_mask.to(device)
         else:
-            assert len(applied_mask) == 2 # (image, mask)
+            assert len(applied_mask) == 2  # (image, mask)
             applied_mask = (
                 applied_mask[0].to(device),
-                applied_mask[1].to(device)
+                applied_mask[1].to(device),
             )
 
         with torch.no_grad():
@@ -352,12 +354,16 @@ def add_foreground_score(
             mask_value = metadata["mask_value"][i].item()
 
             for foreground_detector in foreground_detectors_to_process:
+                # # clip ensemble is only used for ens_entropy
+                # if foreground_detector != "ens_entropy" and isinstance(model, ClipEnsemble):
+                #     continue
 
                 res = res_per_fg_score[foreground_detector]
 
                 process_outputs(
                     i,
                     foreground_detector,
+                    # applied_mask,
                     model_outputs,
                     label,
                     mask_value,
@@ -366,7 +372,8 @@ def add_foreground_score(
                     metadata_key,
                     model_name,
                     bbox,
-                    mask
+                    mask,
+                    # uncertainty_estimators_dict=uncertainty_estimators_dict
                 )
 
         # if len(res["source_image_path"]) > 300:
@@ -387,6 +394,7 @@ def add_foreground_score(
 def process_outputs(
     i,
     foreground_detector,
+    # model_inputs,
     model_outputs,
     label,
     mask_value,
@@ -395,18 +403,28 @@ def process_outputs(
     metadata_key,
     model_name,
     bbox,
-    mask
+    mask,
+    # uncertainty_estimators_dict
 ):
-    keyword, label_key, metadata_key = make_keyword(foreground_detector, model_name)
+    keyword, label_key, metadata_key = make_keyword(
+        foreground_detector, model_name
+    )
 
     # label_key = f"{keyword}_label"
     # metadata_key = f"{keyword}_metadata"
-    foreground_score, (max_prob, max_class, gt_prob, gt_label) = compute_foreground_score(
+    foreground_score, (
+        max_prob,
+        max_class,
+        gt_prob,
+        gt_label,
+    ) = compute_foreground_score(
+        # model_inputs[i],
         model_outputs[i],
         label[i],
         foreground_detector,
         bbox[i],
-        mask[i]
+        mask[i],
+        # uncertainty_estimators_dict=uncertainty_estimators_dict
     )
 
     # if foreground_detector in ("oracle", "max_prob"):
@@ -429,14 +447,23 @@ def process_outputs(
 
 
 def compute_foreground_score(
+    # model_inputs,
     model_outputs,
     label,
     foreground_detector,
     bbox=None,
-    mask=None
+    mask=None,
+    # uncertainty_estimators_dict=None
 ):
-    assert foreground_detector in ("bbox_iou", "oracle", "max_prob")
+    assert foreground_detector in (
+        "bbox_iou",
+        "ens_entropy",
+        "oracle",
+        "max_prob",
+    )
     probs = get_probs(model_outputs)
+    if foreground_detector == "ens_entropy":
+        probs = probs.mean(dim=0)  # average over num_models
     max_class = probs.argmax(dim=-1).item()
     max_prob = probs[..., max_class].item()
     gt_prob = probs[..., label].item()
@@ -444,32 +471,74 @@ def compute_foreground_score(
     metadata = (max_prob, max_class, gt_prob, label)
     if foreground_detector == "oracle":
         # print("Probs:", probs.shape)
-        return gt_prob, metadata
+        score = gt_prob
+        # return gt_prob, metadata
     elif foreground_detector == "max_prob":
-        return max_prob, metadata
+        score = max_prob
+        # return max_prob, metadata
+    elif foreground_detector == "ens_entropy":
+        # assert uncertainty_estimators_dict is not None
+        # ens_output = uncertainty_estimators_dict[foreground_detector](model_inputs)
+
+        # assert ClipEnsemble output
+        # assert isinstance(model_outputs, (list))
+        assert len(model_outputs.shape) == 2  # [num_models, num_classes]
+
+        score = compute_ens_entropy(model_outputs)
+
     else:
         assert foreground_detector == "bbox_iou"
         bbox_iou = compute_bbox_fit_score(mask, bbox)
-        return bbox_iou, metadata
+        score = bbox_iou
+        # return bbox_iou, metadata
+    return score, metadata
 
 
-def merge_dfs(
-    df,
-    res,
-    label_key
-):
+def compute_ens_entropy(model_outputs):
+    # stacked_logits = None
+    # for logits in model_outputs:
+    #     # logits = res[model_id][sample_id]
+    #     # append_dict(
+    #     #     unc_scores,
+    #     #     {model_id: {"conf": get_probs(logits).max().item()}},
+    #     #     allow_new_keys=True
+    #     # )
+    #     # # print(unc_scores)
+    #     # append_dict(
+    #     #     unc_scores,
+    #     #     {model_id: {"entropy": [entropy(logits).item()]}},
+    #     #     allow_new_keys=True
+    #     # )
+    #     # print(unc_scores)
+    #     # unc_scores[model_id]["conf"].append
+    #     # unc_scores[model_id]["entropy"] = entropy(logits).item()
+    #     if stacked_logits is None:
+    #         stacked_logits = logits.unsqueeze(0)
+    #     else:
+    #         stacked_logits = torch.cat([stacked_logits, logits.unsqueeze(0)], dim=0)
+    # stacked_logits = torch.cat(model_outputs, dim=0)
+    # return entropy(stacked_logits).item()
+    raise NotImplementedError("Does 1 - ens_entropy help?")
+    return 1 - ens_entropy_per_sample(model_outputs).item()
+
+
+def merge_dfs(df, res, label_key):
     df_with_score = pd.DataFrame(res)
 
     # compute is_main_object as max score
-    df_with_score['max_score'] = df_with_score.groupby('source_image_path')['score_for_label'].transform('max')
+    df_with_score["max_score"] = df_with_score.groupby("source_image_path")[
+        "score_for_label"
+    ].transform("max")
     df_with_score[label_key] = (
-        df_with_score['score_for_label'] == df_with_score['max_score']
+        df_with_score["score_for_label"] == df_with_score["max_score"]
     ).astype(int)
     df_with_score.pop("score_for_label")
     df_with_score.pop("max_score")
 
     # concat dfs
-    df = pd.merge(df, df_with_score, on=['source_image_path', 'mask_value'], how='inner')
+    df = pd.merge(
+        df, df_with_score, on=["source_image_path", "mask_value"], how="inner"
+    )
 
     return df
 
@@ -482,11 +551,7 @@ def check_model_specific_options(model, model_name):
         assert len(model) == 2
         model, transform = model
         model_name_str = model_name.lower()
-        if (
-                ("maft" in model_name_str)
-            or
-                ("alpha_clip" in model_name_str)
-        ):
+        if ("maft" in model_name_str) or ("alpha_clip" in model_name_str):
             apply_mask = False
     else:
         transform = EVAL_TRANSFORM_APPLIED_MASK_CONFIG
@@ -505,8 +570,6 @@ def apply_dataset_specific_options(model, dataset_path):
 
 
 def wrap_model(model, wrapper_type):
-
-
     if wrapper_type is None:
         return model
 
@@ -543,10 +606,10 @@ def eval_models(
     models,
     fg_detectors,
     full_res_save_path,
-    device='cuda',
+    device="cuda",
     batch_size=128,
     clean_dataloader_kwargs={"clean_type": "counter_animal"},
-    recompute_all=False
+    recompute_all=False,
 ):
     """
     Evaluates machine learning models using specified datasets, transformations, and foreground (FG) detectors,
@@ -589,7 +652,9 @@ def eval_models(
 
     if clean_type == "imagenet_d_bg":
         # dataset_name_path_list = [("clean_in_d_bg", IN_D_PATH)]
-        dataset_name_path_list = [("imagenet_d_bg", (IN_D_PATH, clean_dataloader_kwargs))]
+        dataset_name_path_list = [
+            ("imagenet_d_bg", (IN_D_PATH, clean_dataloader_kwargs))
+        ]
     elif clean_type == "in_val":
         raise NotImplementedError("In-val is not supported yet")
         # dataset_name_path_list = [("in_val", (IN_VAL_PATH, clean_dataloader_kwargs))]
@@ -604,16 +669,16 @@ def eval_models(
         #     ("waterbirds_group_1", (WB_GROUP_1_PATH, clean_dataloader_kwargs)),
         #     ("waterbirds_group_2", (WB_GROUP_2_PATH, clean_dataloader_kwargs)),
         #     ("waterbirds_group_3", (WB_GROUP_3_PATH, clean_dataloader_kwargs)),
-            # # fg
-            # ("waterbirds_group_0_only_fg", (WB_GROUP_0_ONLY_FG_PATH, clean_dataloader_kwargs)),
-            # ("waterbirds_group_1_only_fg", (WB_GROUP_1_ONLY_FG_PATH, clean_dataloader_kwargs)),
-            # ("waterbirds_group_2_only_fg", (WB_GROUP_2_ONLY_FG_PATH, clean_dataloader_kwargs)),
-            # ("waterbirds_group_3_only_fg", (WB_GROUP_3_ONLY_FG_PATH, clean_dataloader_kwargs)),
-            # # bg
-            # ("waterbirds_group_0_only_bg", (WB_GROUP_0_ONLY_BG_PATH, clean_dataloader_kwargs)),
-            # ("waterbirds_group_1_only_bg", (WB_GROUP_1_ONLY_BG_PATH, clean_dataloader_kwargs)),
-            # ("waterbirds_group_2_only_bg", (WB_GROUP_2_ONLY_BG_PATH, clean_dataloader_kwargs)),
-            # ("waterbirds_group_3_only_bg", (WB_GROUP_3_ONLY_BG_PATH, clean_dataloader_kwargs))
+        # # fg
+        # ("waterbirds_group_0_only_fg", (WB_GROUP_0_ONLY_FG_PATH, clean_dataloader_kwargs)),
+        # ("waterbirds_group_1_only_fg", (WB_GROUP_1_ONLY_FG_PATH, clean_dataloader_kwargs)),
+        # ("waterbirds_group_2_only_fg", (WB_GROUP_2_ONLY_FG_PATH, clean_dataloader_kwargs)),
+        # ("waterbirds_group_3_only_fg", (WB_GROUP_3_ONLY_FG_PATH, clean_dataloader_kwargs)),
+        # # bg
+        # ("waterbirds_group_0_only_bg", (WB_GROUP_0_ONLY_BG_PATH, clean_dataloader_kwargs)),
+        # ("waterbirds_group_1_only_bg", (WB_GROUP_1_ONLY_BG_PATH, clean_dataloader_kwargs)),
+        # ("waterbirds_group_2_only_bg", (WB_GROUP_2_ONLY_BG_PATH, clean_dataloader_kwargs)),
+        # ("waterbirds_group_3_only_bg", (WB_GROUP_3_ONLY_BG_PATH, clean_dataloader_kwargs))
         # ]
     elif "imagenet_9_mix_rand" in clean_type:
         raise NotImplementedError("Imagenet-9 mix rand is not supported yet")
@@ -642,31 +707,40 @@ def eval_models(
     apply_mask = True
 
     for model_name, model in models.items():
-
-        model, apply_mask, transform_config = check_model_specific_options(model, model_name)
+        model, apply_mask, transform_config = check_model_specific_options(
+            model, model_name
+        )
 
         for fg_detector in fg_detectors:
-
             if fg_detector is None:
-
-                fg_keyword = make_fg_keyword("None", model_name)
-                for clean_dataset_name, clean_dataset_path \
-                    in dataset_name_path_list:
-
+                # fg_keyword = make_fg_keyword("None", model_name)
+                fg_keyword, _, _ = make_keyword("None", model_name)
+                for (
+                    clean_dataset_name,
+                    clean_dataset_path,
+                ) in dataset_name_path_list:
                     transform = resolve_transform(transform_config)
 
-                    model, original_model, clean_dataset_path = apply_dataset_specific_options(model, clean_dataset_path)
+                    (
+                        model,
+                        original_model,
+                        clean_dataset_path,
+                    ) = apply_dataset_specific_options(
+                        model, clean_dataset_path
+                    )
 
                     dl = make_dataloader(
                         clean_dataset_path,
                         transform=transform,
                         batch_size=batch_size,
                         return_path=True,
-                        dataloader_type=clean_dataset_name, # TODO(Alex | 19.12.2024): check that it does not fail for CounterAnimal and ImageNet-D
-                        **clean_dataloader_kwargs
+                        dataloader_type=clean_dataset_name,  # TODO(Alex | 19.12.2024): check that it does not fail for CounterAnimal and ImageNet-D
+                        **clean_dataloader_kwargs,
                     )
 
-                    full_keyword = f"{clean_dataset_name}{ENCODED_NAME_SEP}{fg_keyword}"
+                    full_keyword = (
+                        f"{clean_dataset_name}{ENCODED_NAME_SEP}{fg_keyword}"
+                    )
 
                     eval_on_dl(
                         full_res,
@@ -676,15 +750,19 @@ def eval_models(
                         device=device,
                         full_res_save_path=full_res_save_path,
                         mode=eval_mode,
-                        recompute_all=recompute_all
+                        recompute_all=recompute_all,
                     )
 
                     model = original_model
             else:
-                fg_keyword = make_fg_keyword(fg_detector, model_name)
+                # fg_keyword = make_fg_keyword(fg_detector, model_name)
+                fg_keyword, _, _ = make_keyword(fg_detector, model_name)
                 for parquet_name, parquet_path in parquets.items():
-
-                    model, original_model, parquet_path = apply_dataset_specific_options(model, parquet_path)
+                    (
+                        model,
+                        original_model,
+                        parquet_path,
+                    ) = apply_dataset_specific_options(model, parquet_path)
 
                     dl = make_bbox_dl_from_csv(
                         csv_path=parquet_path,
@@ -696,10 +774,12 @@ def eval_models(
                         # return_path=True,
                         fg_keyword=fg_keyword,
                         apply_mask=apply_mask,
-                        eval_transform=transform_config
+                        eval_transform=transform_config,
                     )
 
-                    full_keyword = f"{parquet_name}{ENCODED_NAME_SEP}{fg_keyword}"
+                    full_keyword = (
+                        f"{parquet_name}{ENCODED_NAME_SEP}{fg_keyword}"
+                    )
                     # if apply_mask:
                     #     images_extractor = None
                     # else:
@@ -713,7 +793,7 @@ def eval_models(
                         device=device,
                         full_res_save_path=full_res_save_path,
                         mode=eval_mode,
-                        recompute_all=recompute_all
+                        recompute_all=recompute_all,
                     )
 
                     model = original_model
@@ -729,8 +809,8 @@ def eval_models(
     return full_res
 
 
-def make_fg_keyword(fg_detector, model_name):
-    return f"{fg_detector}{ENCODED_NAME_SEP}{model_name}"
+# def make_fg_keyword(fg_detector, model_name):
+#     return f"{fg_detector}{ENCODED_NAME_SEP}{model_name}"
 
 
 def resolve_transform(transform_config):
@@ -746,10 +826,10 @@ def eval_on_dl(
     full_keyword,
     dl,
     model,
-    device='cuda',
+    device="cuda",
     full_res_save_path=None,
     mode=None,
-    recompute_all=False
+    recompute_all=False,
 ):
     if not recompute_all and full_keyword in full_res:
         print(f"{full_keyword} already in results")
@@ -759,17 +839,15 @@ def eval_on_dl(
         detailed_res = predict_with_model(model, dl, device=device)
 
         if mode == "counter_animal":
-            accs_dict, _, _ = compute_mean_per_class_acc_from_detailed_res(detailed_res)
+            accs_dict, _, _ = compute_mean_per_class_acc_from_detailed_res(
+                detailed_res
+            )
             acc = sum(accs_dict.values()) / len(accs_dict)
         else:
             acc = compute_acc_from_detailed_res(detailed_res)
     else:
         assert mode == "urban_cars"
-        acc = urban_cars_eval_split(
-            loader=dl,
-            model=model,
-            device=device
-        )
+        acc = urban_cars_eval_split(loader=dl, model=model, device=device)
     # full_keyword = f"{parquet_name}{ENCODED_NAME_SEP}{fg_keyword}"
     full_res[full_keyword] = acc
     # print("evaluation result:", full_res[full_keyword])
@@ -778,12 +856,14 @@ def eval_on_dl(
         torch.save(full_res, full_res_save_path)
 
 
-def predict_with_model(model, dataloader, device='cuda' if torch.cuda.is_available() else 'cpu'):
+def predict_with_model(
+    model, dataloader, device="cuda" if torch.cuda.is_available() else "cpu"
+):
     # Set model to evaluation mode
     model.eval()
 
     # Initialize a dictionary to store paths, predictions, and labels
-    results = {'image_paths': [], 'predictions': [], 'labels': []}
+    results = {"image_paths": [], "predictions": [], "labels": []}
 
     # Transfer the model to the device (CPU or GPU)
     # model = model.to(device)
@@ -804,7 +884,9 @@ def predict_with_model(model, dataloader, device='cuda' if torch.cuda.is_availab
             # images, labels, paths = batch
 
             # Transfer images and labels to the device
-            if torch.is_tensor(images): # sometimes images are list of tensors (when masks are separate from images)
+            if torch.is_tensor(
+                images
+            ):  # sometimes images are list of tensors (when masks are separate from images)
                 images = images.to(device)
             else:
                 assert len(images) == 2
@@ -818,11 +900,11 @@ def predict_with_model(model, dataloader, device='cuda' if torch.cuda.is_availab
 
             # Store the results
             if paths is not None:
-                results['image_paths'].extend(paths)
-            results['predictions'].extend(predicted.cpu().numpy())
-            results['labels'].extend(labels.cpu().numpy())
+                results["image_paths"].extend(paths)
+            results["predictions"].extend(predicted.cpu().numpy())
+            results["labels"].extend(labels.cpu().numpy())
 
-    model.to('cpu')
+    model.to("cpu")
 
     return results
 
@@ -848,10 +930,10 @@ def compute_mean_per_class_acc_from_detailed_res(detailed_res):
 
 
 def compute_acc_from_detailed_res(detailed_res):
-    total = len(detailed_res['labels'])
+    total = len(detailed_res["labels"])
     correct = 0
     for i in range(total):
-        if detailed_res['predictions'][i] == detailed_res['labels'][i]:
+        if detailed_res["predictions"][i] == detailed_res["labels"][i]:
             correct += 1
     return correct / total
 
@@ -861,17 +943,14 @@ def compute_acc_from_detailed_res(detailed_res):
 def urban_cars_eval_split(
     loader,
     model,
-    device='cuda',
+    device="cuda",
     split="test",
     num_class=URBAN_CARS_NUM_CLASS,
     enable_amp=True,
     bg_ratio=URBAN_CARS_BG_RATIO,
     co_occur_obj_ratio=URBAN_CARS_CO_OCCUR_OBJ_RATIO,
 ):
-
-    meter = MultiDimAverageMeter(
-        (num_class, num_class, num_class)
-    )
+    meter = MultiDimAverageMeter((num_class, num_class, num_class))
     total_correct = []
     total_bg_correct = []
     total_co_occur_obj_correct = []
@@ -914,7 +993,7 @@ def urban_cars_eval_split(
         co_occur_obj_correct = pred == co_occur_obj_label
         total_co_occur_obj_correct.append(co_occur_obj_correct.cpu())
 
-    model.to('cpu')
+    model.to("cpu")
 
     num_correct = meter.cum.reshape(*meter.dims)
     cnt = meter.cnt.reshape(*meter.dims)
@@ -937,9 +1016,7 @@ def urban_cars_eval_split(
             mask = first_shortcut_mask * co_occur_obj_shortcut_mask
             acc = multi_dim_color_acc[mask].mean().item()
             bg_shortcut_str = absent_present_str_list[bg_shortcut]
-            co_occur_obj_shortcut_str = absent_present_str_list[
-                second_shortcut
-            ]
+            co_occur_obj_shortcut_str = absent_present_str_list[second_shortcut]
             log_dict[
                 f"{split}_bg_{bg_shortcut_str}"
                 f"_co_occur_obj_{co_occur_obj_shortcut_str}_acc"
@@ -948,9 +1025,7 @@ def urban_cars_eval_split(
             cur_group_co_occur_obj_ratio = (
                 absent_present_co_occur_obj_ratio_list[second_shortcut]
             )
-            cur_group_ratio = (
-                cur_group_bg_ratio * cur_group_co_occur_obj_ratio
-            )
+            cur_group_ratio = cur_group_bg_ratio * cur_group_co_occur_obj_ratio
             weighted_group_acc += acc * cur_group_ratio
 
     bg_gap = (
@@ -976,9 +1051,7 @@ def urban_cars_eval_split(
     )
 
     total_bg_correct = torch.cat(total_bg_correct, dim=0)
-    total_co_occur_obj_correct = torch.cat(
-        total_co_occur_obj_correct, dim=0
-    )
+    total_co_occur_obj_correct = torch.cat(total_co_occur_obj_correct, dim=0)
     total_correct = torch.cat(total_correct, dim=0)
 
     (

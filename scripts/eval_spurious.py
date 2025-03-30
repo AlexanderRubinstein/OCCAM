@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__))))
 #     eval_models,
 #     # load_model,
 #     # add_lle_model
-# ) ??
+# )
 
 # sys.path.pop(0)
 from occam.robust_classification.eval import (
@@ -36,6 +36,7 @@ from occam.robust_classification.models import (
     add_openai_clip_model,
     add_alpha_clip_model,
     add_openclip_model,
+    make_clip_ensemble,
 )
 from occam.datasets.imagenet_d import (
     IN_D_PATH,
@@ -46,7 +47,7 @@ from occam.datasets.imagenet_classes import get_in_classes_prompts
 # from occam.eval_clip.eval import (
 #     add_openai_clip_model,
 #     add_alpha_clip_model,
-# ) ??
+# )
 from occam.datasets.waterbirds import (
     WATERBIRDS_PATHS,
     get_clip_wb_category_list,
@@ -103,6 +104,11 @@ def get_parser():
         default="cropformer",
         help="mask source",
         choices=["cropformer", "dino_ft"],
+    )
+    parser.add_argument(
+        "--ens_entropy",
+        action="store_true",
+        help="use ens entropy as foreground score",
     )
     return parser
 
@@ -384,6 +390,10 @@ def main():
     else:
         fg_detectors = ["oracle", "max_prob"]
 
+    if args.ens_entropy:
+        assert args.clip
+        fg_detectors += ["ens_entropy"]
+
     clean_dataloader_kwargs = {
         "clean_type": args.dataset_name,
     }
@@ -581,7 +591,10 @@ def main():
         split_images_masks.append(
             (
                 parquet_name,
-                (IN_D_PATH, {"to_map_labels": False}),
+                (
+                    os.path.join(IN_D_PATH, "background"),
+                    {"to_map_labels": False},
+                ),
                 os.path.join(
                     masks_base_dir,
                     args.mask_source,
@@ -620,6 +633,15 @@ def main():
             siglip=args.siglip,
         )
 
+    if args.ens_entropy:
+        assert args.clip
+        clip_ensemble = make_clip_ensemble(_category_list)
+        _models_dict["clip_ensemble"] = (
+            clip_ensemble,
+            clip_ensemble.preprocess,
+        )
+        # raise NotImplementedError("Do we return preprocess as second arg for others?")
+
     for (
         split,
         images_path,
@@ -651,6 +673,11 @@ def main():
             dataset_name=args.dataset_name,
             recompute_all=args.recompute_all,
         )
+
+    if args.ens_entropy:
+        _models_dict.pop(
+            "clip_ensemble"
+        )  # was needed only to compute ens_entropy scores
 
     eval_models(
         parquets=parquets,
