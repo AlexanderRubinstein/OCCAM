@@ -3,3 +3,4 @@ repos:
     rev: 23.12.1  # Use the latest version
     hooks:
     -   id: black
+        args: [--line-length=80]
