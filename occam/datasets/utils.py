@@ -18,7 +18,7 @@ from stuned.utility.utils import (
     # raise_unknown,
     str_is_number,
     load_from_pickle,
-    optionally_make_dir
+    optionally_make_dir,
 )
 from stuned.local_datasets.imagenet1k import (
     DEFAULT_MEAN,
@@ -28,12 +28,10 @@ from stuned.local_datasets.imagenet1k import (
 
 
 # local modules
-sys.path.insert(
-    0,
-    get_project_root_path()
-)
+sys.path.insert(0, get_project_root_path())
 # import densifier
 import occam
+
 # from densifier.datasets.imagenet_classes import get_in_classes_prompts
 # from densifier.utility.utils_for_notebooks import (
 #     visualize_images_side_by_side,
@@ -55,32 +53,26 @@ sys.path.pop(0)
 
 
 IMAGE_NORMALIZATION_CONST = 255
-DATA_PATH = os.path.join(
-    get_project_root_path(),
-    "data"
-)
-JSON_PATH = os.path.join(
-    get_project_root_path(),
-    "jsons"
-)
-DATASETS_PATH = os.path.join(
-    DATA_PATH,
-    "datasets"
-)
+DATA_PATH = os.path.join(get_project_root_path(), "data")
+JSON_PATH = os.path.join(get_project_root_path(), "jsons")
+DATASETS_PATH = os.path.join(DATA_PATH, "datasets")
 
 
 def open_pil_image(image_path):
-    return np.array(Image.open(image_path).convert('RGB')) / IMAGE_NORMALIZATION_CONST
+    return (
+        np.array(Image.open(image_path).convert("RGB"))
+        / IMAGE_NORMALIZATION_CONST
+    )
 
 
 def make_wandb_image(tensor, caption=None):
     return wandb.Image(
-        unnormalize(
-            tensor,
-            (0.5, 0.5, 0.5),
-            (0.5, 0.5, 0.5)
-        ).squeeze(0).permute(1, 2, 0).cpu().numpy(),
-        caption=caption
+        unnormalize(tensor, (0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        .squeeze(0)
+        .permute(1, 2, 0)
+        .cpu()
+        .numpy(),
+        caption=caption,
     )
 
 
@@ -100,20 +92,28 @@ def unnormalize(tensor, mean=[0], std=[1], inplace=False):
     """
 
     if not torch.is_tensor(tensor):
-        raise TypeError('tensor should be a torch tensor. Got {}.'.format(type(tensor)))
+        raise TypeError(
+            "tensor should be a torch tensor. Got {}.".format(type(tensor))
+        )
 
     if tensor.ndimension() != 4:
-        raise ValueError('Expected tensor to be a tensor image of size (N, C, H, W). Got tensor.size() = '
-                         '{}.'.format(tensor.size()))
+        raise ValueError(
+            "Expected tensor to be a tensor image of size (N, C, H, W). Got tensor.size() = "
+            "{}.".format(tensor.size())
+        )
     if not inplace:
-        tensor=tensor.clone()
+        tensor = tensor.clone()
 
     dtype = tensor.dtype
     mean = torch.as_tensor(mean, dtype=dtype, device=tensor.device)
     std = torch.as_tensor(std, dtype=dtype, device=tensor.device)
 
     if (std == 0).any():
-        raise ValueError('std evaluated to zero after conversion to {}, leading to division by zero.'.format(dtype))
+        raise ValueError(
+            "std evaluated to zero after conversion to {}, leading to division by zero.".format(
+                dtype
+            )
+        )
 
     if mean.ndim == 1:
         mean = mean[None, :, None, None]
@@ -125,11 +125,7 @@ def unnormalize(tensor, mean=[0], std=[1], inplace=False):
 
 
 def unnormalize_in1k(image):
-    return unnormalize(
-        image,
-        DEFAULT_MEAN,
-        DEFAULT_STD
-    )
+    return unnormalize(image, DEFAULT_MEAN, DEFAULT_STD)
 
 
 def torch_max_func(tensor, axis):
@@ -138,9 +134,7 @@ def torch_max_func(tensor, axis):
 
 # based on https://github.com/bethgelab/model-vs-human/blob/master/modelvshuman/datasets/decision_mappings.py
 class ToClassesMapping:
-
     def __init__(self, indices_for_category, aggregation_function=torch.mean):
-
         self.aggregation_function = aggregation_function
         self.indices_for_category = indices_for_category
         self.categories = self.indices_for_category.categories
@@ -163,14 +157,15 @@ class ToClassesMapping:
             aggregated_class_probabilities.append(aggregated_value.unsqueeze(1))
 
         aggregated_class_probabilities = torch.cat(
-            aggregated_class_probabilities,
-            dim=1
+            aggregated_class_probabilities, dim=1
         )
 
         return aggregated_class_probabilities
 
 
-def make_to_classes_mapping(indices_for_category, aggregation_function=torch.mean):
+def make_to_classes_mapping(
+    indices_for_category, aggregation_function=torch.mean
+):
     return ToClassesMapping(indices_for_category, aggregation_function)
 
 
@@ -264,7 +259,6 @@ def make_model_classes_wrapper(model, make_mapper):
 
 
 class ModelClassesWrapper(ModuleDelegatingWrapper):
-
     def __init__(self, model, make_mapper):
         super().__init__(model)
         self.mapper = make_mapper()
@@ -316,7 +310,7 @@ def make_custom_folder_path2label(dataset_path):
         transform=transform,
         return_path=return_path,
         masks=masks,
-        mask_transform=mask_transform
+        mask_transform=mask_transform,
     )
 
     # res = []
@@ -327,14 +321,8 @@ def make_custom_folder_path2label(dataset_path):
 
 
 class CustomImageFolder(ImageFolder):
-
     def __init__(
-        self,
-        root,
-        return_path=False,
-        masks=None,
-        mask_transform=None,
-        **kwargs
+        self, root, return_path=False, masks=None, mask_transform=None, **kwargs
     ):
         super().__init__(root, **kwargs)
         self.masks = masks
@@ -357,7 +345,6 @@ class CustomImageFolder(ImageFolder):
             #     "Resize interpolations should be the same"
 
     def __getitem__(self, index: int):
-
         path, target = self.samples[index]
         sample = self.loader(path)
         if self.transform is not None:
@@ -368,13 +355,14 @@ class CustomImageFolder(ImageFolder):
         return_value = [sample, target]
 
         if self.masks is not None:
-
             image_name = os.path.basename(path)
             image_class = os.path.basename(os.path.dirname(path))
-            image_type = os.path.basename(os.path.dirname(os.path.dirname(path)))
+            image_type = os.path.basename(
+                os.path.dirname(os.path.dirname(path))
+            )
             mask_id = f"{image_type}_{image_class}_{image_name}"
 
-            mask = self.masks[mask_id]['mask']
+            mask = self.masks[mask_id]["mask"]
             if self.mask_transform is not None:
                 mask = self.mask_transform(mask)
                 # mask = einops.repeat(mask, 'b c h w -> b (repeat c) h w', repeat=3)
@@ -407,7 +395,7 @@ def make_custom_folder_dataloader(
     num_workers=4,
     return_path=False,
     masks=None,
-    mask_transform=None
+    mask_transform=None,
 ):
     if mask_transform is not None:
         assert masks is not None
@@ -416,33 +404,34 @@ def make_custom_folder_dataloader(
         transform=transform,
         return_path=return_path,
         masks=masks,
-        mask_transform=mask_transform
+        mask_transform=mask_transform,
     )
     return torch.utils.data.DataLoader(
-        dataset,
-        batch_size=batch_size,
-        num_workers=num_workers
+        dataset, batch_size=batch_size, num_workers=num_workers
     )
 
 
 def make_mapping_dict_generic_from_folder(
     images_folder,
     masks_path,
-    separate_masks_folder
+    bboxes_path,
+    separate_masks_folder,
 ):
     return make_mapping_dict_generic(
         images_folder,
         masks_path,
-        separate_masks_folder,
-        path2label_func=make_custom_folder_path2label
+        bboxes_path=bboxes_path,
+        separate_masks_folder=separate_masks_folder,
+        path2label_func=make_custom_folder_path2label,
     )
 
 
 def make_mapping_dict_generic(
-    images_folder, # can contain dataset_kwargs: (images_folder, dataset_kwargs)
-    masks_path, # can contain bboxes_path: (masks_path, bboxes_path)
+    images_folder,  # can contain dataset_kwargs: (images_folder, dataset_kwargs)
+    masks_path,  # can contain bboxes_path: (masks_path, bboxes_path)
+    bboxes_path,
     separate_masks_folder,
-    path2label_func
+    path2label_func,
 ):
     # path2label = make_path2label_imagenet_d(images_folder)
     # path2label = make_path2label_counter_animal(images_folder)
@@ -474,7 +463,7 @@ def make_mapping_dict_from_folder(
     masks_path,
     separate_masks_folder,
     bboxes_path,
-    assert_shape=False
+    assert_shape=False,
 ):
     """
     Generates a mapping dictionary linking image paths to corresponding mask paths, bounding box paths,
@@ -501,13 +490,13 @@ def make_mapping_dict_from_folder(
     # def subpath(path, k):
     #     return "".join(path.split(os.sep)[-k:])
 
-
     def get_bbox_path(path, bboxes_folder):
         if os.path.basename(bboxes_folder) == "val":
             bboxes_type = "val"
         else:
-            assert os.path.basename(bboxes_folder) == "Annotation", \
-                "train bboxes should be in Annotation folder"
+            assert (
+                os.path.basename(bboxes_folder) == "Annotation"
+            ), "train bboxes should be in Annotation folder"
             bboxes_type = "train"
 
         class_id = os.path.basename(os.path.dirname(path))
@@ -515,7 +504,9 @@ def make_mapping_dict_from_folder(
             folder_path = bboxes_folder
         else:
             folder_path = os.path.join(bboxes_folder, class_id)
-        return os.path.join(folder_path, os.path.basename(path).replace(".JPEG", ".xml"))
+        return os.path.join(
+            folder_path, os.path.basename(path).replace(".JPEG", ".xml")
+        )
 
     res = {}
     masks = load_from_pickle(masks_path)
@@ -554,7 +545,7 @@ def make_mapping_dict_from_folder(
         mask_path = os.path.join(
             separate_masks_folder,
             # os.path.basename(path).split(".")[0] + ".mask"
-            make_mask_name_from_path(path)
+            make_mask_name_from_path(path),
         )
 
         torch.save(mask, mask_path)
@@ -576,22 +567,19 @@ def make_mask_name_from_path(path):
     return path.replace(os.sep, "@") + ".mask"
 
 
-def make_source_df(
-    mapping_dict
-):
+def make_source_df(mapping_dict):
     res = {
-        'source_image_path': [],
-        'classification_label': [],
-        'image_to_label': [],
-        'main_object_label': [],
-        'mask_path': [],
-        'mask_value': [],
-        'bbox_path': [],
-        'metadata': []
+        "source_image_path": [],
+        "classification_label": [],
+        "image_to_label": [],
+        "main_object_label": [],
+        "mask_path": [],
+        "mask_value": [],
+        "bbox_path": [],
+        "metadata": [],
     }
 
     for image_path, image_data in tqdm(mapping_dict.items()):
-
         mask_path = image_data[0]
         bbox_path = image_data[1]
         image_label = image_data[2]
@@ -608,7 +596,6 @@ def make_source_df(
         # metadata = {}
 
         for mask_value in all_mask_values:
-
             # metadata_key = str(mask_value)
 
             res["source_image_path"].append(image_path)

@@ -331,11 +331,12 @@ def make_waterbirds_clip_wrapper(model):
 
 
 def make_mapping_dict_waterbirds(
-    images_folder, masks_path, separate_masks_folder
+    images_folder, masks_path, bboxes_path, separate_masks_folder
 ):
     return make_mapping_dict_generic(
         images_folder,
         masks_path,
-        separate_masks_folder,
+        bboxes_path=bboxes_path,
+        separate_masks_folder=separate_masks_folder,
         path2label_func=make_path2label_waterbirds,
     )

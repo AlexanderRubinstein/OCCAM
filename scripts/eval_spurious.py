@@ -535,7 +535,8 @@ def main():
                     WATERBIRDS_PATHS[group_id],
                     os.path.join(
                         masks_base_dir,
-                        f"Waterbirds_test_group{group_id}_masks_{args.mask_source}.pkl",
+                        args.mask_source,
+                        f"WB_group_{group_id}_masks.pkl",
                     ),
                     os.path.join(
                         separate_masks_base_dir,
@@ -668,7 +669,8 @@ def main():
         make_df_with_foreground_scores(
             source_df_path=parquets[split],  # attention to mappers
             images_path=images_path,
-            masks_path=masks_path,
+            masks_path=real_masks_path,
+            bboxes_path=real_bboxes_path,
             separate_masks_folder=separate_masks_folder,
             models_dict=_models_dict,
             foreground_detectors=fg_detectors,
@@ -693,7 +695,9 @@ def main():
     )
 
     df = convert_to_table(args.result_path, args.dataset_name)
-    pd.set_option("display.max_colwidth", MAX_COL_WIDTH)
+    pd.set_option(
+        "display.max_colwidth", MAX_COL_WIDTH
+    )  # to see long model names
     print(df)
 
 

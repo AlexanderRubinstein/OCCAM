@@ -1,8 +1,10 @@
 import json
 import torch
+
 # import h5py
 import os
 import sys
+
 # import torch
 # import numpy as np
 # import random
@@ -16,7 +18,7 @@ from stuned.utility.utils import (
     # get_project_root_path,
     get_with_assert,
     read_json,
-    get_project_root_path
+    get_project_root_path,
 )
 
 
@@ -31,10 +33,7 @@ IMAGENET_9_SUBSETS = ["mixed_rand"]
 # IMAGENET_D_ID_MAP_JSON = os.path.join(JSON_PATH, "imgnet_d2imgnet_id.json")
 
 
-sys.path.insert(
-    0,
-    get_project_root_path()
-)
+sys.path.insert(0, get_project_root_path())
 from occam.datasets.utils import (
     JSON_PATH,
     DATASETS_PATH,
@@ -42,16 +41,13 @@ from occam.datasets.utils import (
     make_model_classes_wrapper,
     get_collate_fn_in_d,
     torch_max_func,
-    make_mapping_dict_generic
+    make_mapping_dict_generic,
 )
+
 sys.path.pop(0)
 
 
-IMAGENET_9_PATH = os.path.join(
-    DATASETS_PATH,
-    "mixed_rand",
-    "val"
-)
+IMAGENET_9_PATH = os.path.join(DATASETS_PATH, "mixed_rand", "val")
 IMAGENET_9_MAP_JSON = os.path.join(JSON_PATH, "in2in9.json")
 IN9_CATEGORIES = [
     "dog",
@@ -62,13 +58,13 @@ IN9_CATEGORIES = [
     "insect",
     "musical instrument",
     "primate",
-    "fish"
+    "fish",
 ]
 
 
 class ImageNet9Dataset(torch.utils.data.Dataset):
-
-    def __init__ (self,
+    def __init__(
+        self,
         test_base_dir,
         few_test=None,
         transform=None,
@@ -81,7 +77,7 @@ class ImageNet9Dataset(torch.utils.data.Dataset):
 
         self.few_test = few_test
 
-        self.transforms=transform
+        self.transforms = transform
 
         # with open(IMAGENET_9_MAP_JSON) as f:
         #     dict_in2in9 = json.load(f)
@@ -102,20 +98,19 @@ class ImageNet9Dataset(torch.utils.data.Dataset):
         # }
 
         # ?? map numbers to category names
-# ?? many to 1 relationship
-#         dict_in9_to_in = {
-#             int_to_category[v]: k
-#                 for k, v
-#                     in dict_in2in9.items()
-#                         if v != -1
-#         }
+        # ?? many to 1 relationship
+        #         dict_in9_to_in = {
+        #             int_to_category[v]: k
+        #                 for k, v
+        #                     in dict_in2in9.items()
+        #                         if v != -1
+        #         }
 
         categories_list = os.listdir(self.test_path)
 
         category_to_label = {
-            category: int(category.split('_')[0])
-                for category
-                    in (categories_list)
+            category: int(category.split("_")[0])
+            for category in (categories_list)
         }
 
         # categories_list = os.listdir(dataset_path)
@@ -141,8 +136,7 @@ class ImageNet9Dataset(torch.utils.data.Dataset):
 
         #             self.label_lists.append([int(category2id_patched[each])])
         self.file_lists, self.label_lists = make_file_and_label_lists(
-            self.test_path,
-            category_to_label
+            self.test_path, category_to_label
         )
 
     def __len__(self):
@@ -155,7 +149,7 @@ class ImageNet9Dataset(torch.utils.data.Dataset):
         return self.transforms(sample)
 
     def __getitem__(self, item):
-        path_list=self.file_lists[item]
+        path_list = self.file_lists[item]
         img = PIL.Image.open(path_list).convert("RGB")
 
         img_tensor = self._transform(img)
@@ -174,7 +168,6 @@ def invert_dict_with_repetitions(d):
 
 
 class IN9Categories:
-
     def __init__(self):
         map_to_in9 = read_json(IMAGENET_9_MAP_JSON)
         self.in9_to_in1000 = invert_dict_with_repetitions(map_to_in9)
@@ -184,7 +177,6 @@ class IN9Categories:
         self.categories = IN9_CATEGORIES
         self.cat_to_id = {cat: i for i, cat in enumerate(self.categories)}
 
-
     def __call__(self, category_name):
         category_id = self.cat_to_id[category_name]
         return self.in9_to_in1000[category_id]
@@ -192,15 +184,13 @@ class IN9Categories:
 
 def make_in9_mapper():
     mapper = make_to_classes_mapping(
-        IN9Categories(),
-        aggregation_function=torch_max_func
+        IN9Categories(), aggregation_function=torch_max_func
     )
     # mapper.categories = list(range(len(IN9_CATEGOREIS)))
     return mapper
 
 
 def make_file_and_label_lists(dataset_path, category_name2label):
-
     categories_list = os.listdir(dataset_path)
     categories_list.sort()
 
@@ -249,6 +239,7 @@ def make_file_and_label_lists(dataset_path, category_name2label):
 #     category2id = {value: key for key, value in id2category.items()}
 #     return category_list, id2category, category2id
 
+
 def get_in_9_category_list():
     return IN9_CATEGORIES
 
@@ -261,7 +252,9 @@ def make_in9_wrapper(model):
 #     return folder_name.replace('_', ' ').replace('-', ' ').replace('/', ' or ').lower()
 
 
-def make_path2label_in_9(dataset_path, to_map_labels=True): # for counter animal
+def make_path2label_in_9(
+    dataset_path, to_map_labels=True
+):  # for counter animal
     # dataset_path = "/home/oh/arubinstein17/github/densification/data/CounterAnimal/symlinked/counter"
     transform = None
     # return_path = True
@@ -297,7 +290,6 @@ def get_imagenet_9_dataloaders(
     # to_map_labels=True,
     # logger
 ):
-
     data_dir = get_with_assert(dataset_config, "data_dir")
     # dl_types = dataset_config.get("dl_types")
     # if dl_types is not None:
@@ -308,8 +300,8 @@ def get_imagenet_9_dataloaders(
     dataloader_name = None
     for dataloader_name in IMAGENET_9_SUBSETS:
         if dataloader_name == os.path.basename(os.path.dirname(data_dir)):
-        # if dl_types is not None and dataloader_name not in ind_types:
-        #     continue
+            # if dl_types is not None and dataloader_name not in ind_types:
+            #     continue
             dataloader = torch.utils.data.DataLoader(
                 # ImageNetDLoader(
                 #     os.path.join(data_dir, dataloader_name),
@@ -324,7 +316,7 @@ def get_imagenet_9_dataloaders(
                 shuffle=shuffle,
                 num_workers=num_workers,
                 pin_memory=True,
-                collate_fn=get_collate_fn_in_d(drop_paths=True)
+                collate_fn=get_collate_fn_in_d(drop_paths=True),
             )
             break
     assert dataloader is not None
@@ -333,7 +325,9 @@ def get_imagenet_9_dataloaders(
     return dataloader, dataloader_name
 
 
-def make_mapping_dict_imagenet_9(images_folder, masks_path, separate_masks_folder):
+def make_mapping_dict_imagenet_9(
+    images_folder, masks_path, bboxes_path, separate_masks_folder
+):
     # # path2label = make_path2label_imagenet_d(images_folder)
     # # path2label = make_path2label_counter_animal(images_folder)
     # dataset_kwargs = {}
@@ -358,6 +352,7 @@ def make_mapping_dict_imagenet_9(images_folder, masks_path, separate_masks_folde
     return make_mapping_dict_generic(
         images_folder,
         masks_path,
-        separate_masks_folder,
-        path2label_func=make_path2label_in_9
+        bboxes_path=bboxes_path,
+        separate_masks_folder=separate_masks_folder,
+        path2label_func=make_path2label_in_9,
     )

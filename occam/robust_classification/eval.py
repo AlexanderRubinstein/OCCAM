@@ -109,6 +109,7 @@ def make_df_with_foreground_scores(
     source_df_path,
     images_path,
     masks_path,
+    bboxes_path,
     separate_masks_folder,
     models_dict,
     foreground_detectors,
@@ -153,6 +154,7 @@ def make_df_with_foreground_scores(
         make_source_df_per_dataset(
             images_path=images_path,
             masks_path=masks_path,
+            bboxes_path=bboxes_path,
             separate_masks_folder=separate_masks_folder,
             source_df_path=source_df_path,
             make_mapping_dict_func=make_mapping_dict_func,
@@ -183,13 +185,14 @@ def make_df_with_foreground_scores(
 def make_source_df_per_dataset(
     images_path,
     masks_path,
+    bboxes_path,
     separate_masks_folder,
     source_df_path,
     make_mapping_dict_func=make_mapping_dict_counter_animal_,
 ):
     print("making mapping dict")
     mapping_dict = make_mapping_dict_func(
-        images_path, masks_path, separate_masks_folder
+        images_path, masks_path, bboxes_path, separate_masks_folder
     )
     print("making source df")
     source_df = make_source_df(mapping_dict)
@@ -567,7 +570,10 @@ def apply_dataset_specific_options(model, dataset_path):
         mapper = dataset_options.get("mapper", None)
         if mapper is not None:
             # model = mapper(model)
-            model = wrap_model(model, mapper)
+            if isinstance(model, ClipEnsemble):
+                model = model  # don't wrap clip ensemble because we need it only for foreground score
+            else:
+                model = wrap_model(model, mapper)
     return model, original_model, dataset_path
 
 
