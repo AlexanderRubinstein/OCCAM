@@ -50,7 +50,7 @@ def get_parser():
         "--range", help="Range of images to process", default=None
     )
     parser.add_argument(
-        "--confidence-threshold",
+        "--confidence_threshold",
         type=float,
         default=None,
         help="Minimum score for instance predictions of CropFormer to be shown",

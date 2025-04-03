@@ -263,13 +263,8 @@ def add_clip_models(models_dict, category_list, dataset_name, siglip=False):
     else:
         add_openai_clip_model("ViT-L/14", category_list, models_dict)
         add_alpha_clip_model("ViT-L/14", category_list, models_dict)
-        # add_openclip_model(
-        #     model_id='ViT-L-14-quickgelu',
-        #     category_list=category_list,
-        #     models_dict=models_dict,
-        #     pretrained='dfn2b'
-        # )
         add_openai_clip_model("RN50", category_list, models_dict)
+        # print("Uncomment 2 above pls")
     if siglip:
         add_openclip_model(
             model_id="ViT-SO400M-14-SigLIP-384",
@@ -427,7 +422,7 @@ def main():
 
         _images_path = URBAN_CARS_PATH
         _masks_path = os.path.join(
-            masks_base_dir, f"UrbanCars_test_masks_{args.mask_source}.pkl"
+            masks_base_dir, args.mask_source, f"UC_masks.pkl"
         )
 
         _separate_masks_folder = os.path.join(
@@ -499,7 +494,7 @@ def main():
                 _images_path = COMMON_PATH
 
             _masks_path = os.path.join(
-                masks_base_dir, f"{split}_masks_{args.mask_source}.pkl"
+                masks_base_dir, args.mask_source, f"CA_{split}_masks.pkl"
             )
             _separate_masks_folder = os.path.join(_separate_masks_folder, split)
             _df_path = os.path.join(
@@ -564,7 +559,8 @@ def main():
                 IMAGENET_9_PATH,
                 os.path.join(
                     masks_base_dir,
-                    f"ImageNet9_mixed_random_masks_{args.mask_source}.pkl",
+                    args.mask_source,
+                    f"IN_9_masks.pkl",
                 ),
                 os.path.join(
                     separate_masks_base_dir,

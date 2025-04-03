@@ -22,10 +22,13 @@ from stuned.local_datasets.transforms import (
 
 sys.path.insert(0, get_project_root_path())
 from occam.datasets.counter_animal import (
+    COUNTER_PATH,
+    COMMON_PATH,
     make_mapping_dict_counter_animal_,
     make_counter_animal_clip_wrapper,
 )
 from occam.datasets.imagenet_9 import (
+    IMAGENET_9_PATH,
     make_mapping_dict_imagenet_9,
     make_in9_wrapper,
 )
@@ -41,7 +44,7 @@ from occam.datasets.imagenet_d import (
     # make_mapping_dict_imagenet_d_bg
 )
 from occam.datasets.urban_cars import (
-    # URBAN_CARS_PATH,
+    URBAN_CARS_PATH,
     URBAN_CARS_BG_RATIO,
     URBAN_CARS_CO_OCCUR_OBJ_RATIO,
     URBAN_CARS_NUM_CLASS,
@@ -667,9 +670,11 @@ def eval_models(
         raise NotImplementedError("In-val is not supported yet")
         # dataset_name_path_list = [("in_val", (IN_VAL_PATH, clean_dataloader_kwargs))]
     elif clean_type == "urban_cars":
-        raise NotImplementedError("Urban cars are not supported yet")
-        # dataset_name_path_list = [("urban_cars", (URBAN_CARS_PATH, clean_dataloader_kwargs))]
-        # eval_mode = "urban_cars"
+        # raise NotImplementedError("Urban cars are not supported yet")
+        dataset_name_path_list = [
+            ("urban_cars", (URBAN_CARS_PATH, clean_dataloader_kwargs))
+        ]
+        eval_mode = "urban_cars"
     elif clean_type == "waterbirds":
         # raise NotImplementedError("Waterbirds are not supported yet")
         standard_wb_group_paths = [
@@ -706,28 +711,31 @@ def eval_models(
         # ("waterbirds_group_3_only_bg", (WB_GROUP_3_ONLY_BG_PATH, clean_dataloader_kwargs))
         # ]
     elif "imagenet_9_mix_rand" in clean_type:
-        raise NotImplementedError("Imagenet-9 mix rand is not supported yet")
+        # raise NotImplementedError("Imagenet-9 mix rand is not supported yet")
 
-        # if clean_type == "imagenet_9_mix_rand":
-
-        #     # clean_dataset_kwargs = {"mapper": "in9"}
-        #     assert "mapper" in clean_dataloader_kwargs # give mapper in kwargs when calling eval_models
-        #     assert clean_dataloader_kwargs["mapper"] == "in9"
-        # else:
-        #     assert clean_type == "imagenet_9_mix_rand_without_mapper"
-        #     assert len(clean_dataloader_kwargs) == 0
-        #     # clean_dataset_kwargs = {}
-        # dataset_name_path_list = [
-        #     ("imagenet_9", (IN_9_MIXED_RAND_PATH, clean_dataloader_kwargs))
-        # ]
+        if clean_type == "imagenet_9_mix_rand":
+            clean_dataloader_kwargs = {"mapper": "in9"}
+            assert (
+                "mapper" in clean_dataloader_kwargs
+            )  # give mapper in kwargs when calling eval_models
+            assert clean_dataloader_kwargs["mapper"] == "in9"
+        else:
+            assert clean_type == "imagenet_9_mix_rand_without_mapper"
+            assert len(clean_dataloader_kwargs) == 0
+            clean_dataloader_kwargs = {}
+        dataset_name_path_list = [
+            ("imagenet_9", (IMAGENET_9_PATH, clean_dataloader_kwargs))
+        ]
     else:
-        raise NotImplementedError("counter_animal is not supported yet")
-        # assert clean_type == "counter_animal" or clean_type == "counter_animal_gap"
-        # eval_mode = "counter_animal"
-        # dataset_name_path_list = [
-        #     ("clean_counter", (COUNTER_PATH, clean_dataloader_kwargs)),
-        #     ("clean_common", (COMMON_PATH, clean_dataloader_kwargs))
-        # ]
+        # raise NotImplementedError("counter_animal is not supported yet")
+        assert (
+            clean_type == "counter_animal" or clean_type == "counter_animal_gap"
+        )
+        eval_mode = "counter_animal"
+        dataset_name_path_list = [
+            ("clean_counter", (COUNTER_PATH, clean_dataloader_kwargs)),
+            ("clean_common", (COMMON_PATH, clean_dataloader_kwargs)),
+        ]
 
     apply_mask = True
 

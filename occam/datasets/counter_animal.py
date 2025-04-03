@@ -43,6 +43,7 @@ from occam.datasets.utils import (
     # make_to_classes_mapping,
     make_model_classes_wrapper,
     # torch_max_func,
+    make_mapping_dict_from_folder,
 )
 
 # from densifier.eval_clip.eval import (

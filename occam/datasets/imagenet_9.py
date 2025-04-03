@@ -47,7 +47,7 @@ from occam.datasets.utils import (
 sys.path.pop(0)
 
 
-IMAGENET_9_PATH = os.path.join(DATASETS_PATH, "mixed_rand", "val")
+IMAGENET_9_PATH = os.path.join(DATASETS_PATH, "ImageNet-9", "mixed_rand", "val")
 IMAGENET_9_MAP_JSON = os.path.join(JSON_PATH, "in2in9.json")
 IN9_CATEGORIES = [
     "dog",

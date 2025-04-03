@@ -6,7 +6,6 @@ exec_path: <p>
 conda_env: ./envs/occam
 
 kwargs:
-  "model_id": <p>
   "input_folder": <p>
   "output": <p>
 
