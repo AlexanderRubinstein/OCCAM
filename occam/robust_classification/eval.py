@@ -60,6 +60,7 @@ from occam.datasets.utils import (
 from occam.datasets.bboxed_dataset import (
     make_bbox_dl_from_csv,
     compute_bbox_fit_score,
+    load_mask,
 )
 from occam.robust_classification.utils import get_probs
 from occam.datasets.common import make_dataloader
@@ -103,6 +104,7 @@ EVAL_TRANSFORM_APPLIED_MASK_CONFIG = {
     },
 }
 ROUND_DECIMALS = 3
+AREA_THRESHOLD = 1000
 
 
 def extract_el_if_tuple(obj, i=0):
@@ -123,6 +125,7 @@ def make_df_with_foreground_scores(
     batch_size=128,
     num_workers=12,
     recompute_all=False,
+    filter_keyword=None,
 ):
     # counter
     # counter_source_df_path = "/home/oh/arubinstein17/github/densification/data/csvs/source_counter.parquet"
@@ -174,6 +177,9 @@ def make_df_with_foreground_scores(
     else:
         convert_label = None
 
+    if filter_keyword is not None:
+        filter_df(source_df_path, filter_keyword)
+
     for model_name in models_dict.keys():
         add_foreground_score(
             source_df_path,
@@ -185,6 +191,7 @@ def make_df_with_foreground_scores(
             num_workers=num_workers,
             convert_label=convert_label,
             recompute_all=recompute_all,
+            # filter_keyword=filter_keyword,
         )
 
 
@@ -202,8 +209,32 @@ def make_source_df_per_dataset(
     )
     print("making source df")
     source_df = make_source_df(mapping_dict)
+
     extracted_source_df_path = extract_el_if_tuple(source_df_path, i=0)
     to_parquet(source_df, extracted_source_df_path)
+
+
+def filter_df(df_path, filter_keyword):
+    _, _, df_path = apply_dataset_specific_options(None, df_path)
+    print(f"Filtering df: {df_path} based on {filter_keyword}")
+    df = pd.read_parquet(df_path)
+    df.loc[:, filter_keyword] = 1  # column of 1s
+    if filter_keyword == "by_mask_size":
+        # df = df[df["mask_size"] > 0]
+        # iterate over all rows, load masks - compute area - filter
+        for idx, row in tqdm(df.iterrows(), total=len(df)):
+            mask, _ = load_mask(row["mask_path"], row["mask_value"])
+            assert (
+                len(mask.shape) == 2
+            ), f"Mask shape: {mask.shape} for {row['mask_path']} but should be 2D"
+
+            mask_area = mask.sum()
+            if mask_area < AREA_THRESHOLD:
+                df.loc[idx, filter_keyword] = 0
+    else:
+        assert filter_keyword is None
+    to_parquet(df, df_path)
+    # return df
 
 
 def make_keyword(foreground_detector, model_name):
@@ -226,22 +257,9 @@ def add_foreground_score(
     num_workers=12,
     convert_label=None,
     recompute_all=False,
+    # filter_keyword=None,
 ):
-    # df = source_df.copy()
-    # extracted_source_df_path = extract_el_if_tuple(source_df_path, i=0)
-    # df = pd.read_parquet(extracted_source_df_path) # TODO(Alex | 09.11.2024) - don't read df twice, take it from dataset.csv
     model = models_dict[model_name]
-
-    # # is_clip = "lip" in model_name.lower()
-    # apply_mask = True
-    # # if is_clip:
-    # if isinstance(model, (tuple, list)):
-    #     assert len(model) == 2
-    #     model, transform = model
-    #     if "maft" in model_name.lower():
-    #         apply_mask = False
-    # else:
-    #     transform = EVAL_TRANSFORM_APPLIED_MASK_CONFIG
 
     model, apply_mask, transform = check_model_specific_options(
         model, model_name
@@ -250,9 +268,11 @@ def add_foreground_score(
     model, original_model, source_df_path = apply_dataset_specific_options(
         model, source_df_path
     )
-    df = pd.read_parquet(
-        source_df_path
-    )  # TODO(Alex | 09.11.2024) - don't read df twice, take it from dataset.csv
+
+    # read df because we need info about its columns
+    df = pd.read_parquet(source_df_path)
+    # TODO(Alex | 09.11.2024) - don't read df twice, take it from dataset.csv;
+    # or read only column names
 
     print(
         f"Adding foreground scores for {model_name} and detectors=({foreground_detectors})\n df: {source_df_path}"
@@ -262,30 +282,24 @@ def add_foreground_score(
     model.eval()
     model.to(device)
 
+    # filter_keyword is None, because we want to have scores for all masks
+    # to avoid clashes when mask is filtered on this stage but not filtered on eval stage
     dataloader = make_bbox_dl_from_csv(
         source_df_path,
         extended_output=True,
-        # dataset_task="detection",
-        # batch_size=128,
         batch_size=batch_size,
-        # batch_size=1, # to avoid stacking issues for different sizes
         num_workers=num_workers,
         eval_transform=transform,
         apply_mask=apply_mask,
+        filter_keyword=None,
     )
     res_per_fg_score = {}
     foreground_detectors_to_process = (
         []
     )  # to avoid running eval for fg_detectors that are already in df
-    # uncertainty_estimators_dict = None
+
     for fg_detector in foreground_detectors:
         keyword, label_key, metadata_key = make_keyword(fg_detector, model_name)
-
-        # if fg_detector == "ens_entropy" and not isinstance(model, ClipEnsemble):
-        #     continue
-
-        # if fg_detector != "ens_entropy" and isinstance(model, ClipEnsemble):
-        #     continue
 
         if (fg_detector == "ens_entropy") != isinstance(model, ClipEnsemble):
             continue
@@ -307,18 +321,10 @@ def add_foreground_score(
             "score_for_label": [],
             metadata_key: [],
         }
-        # if fg_detector == "ens_entropy":
-        #     uncertainty_estimators_dict[fg_detector] =
 
     if len(res_per_fg_score) == 0:
         return
 
-    # res = {
-    #     "source_image_path": [],
-    #     "mask_value": [],
-    #     "score_for_label": [],
-    #     metadata_key: []
-    # }
     for batch in tqdm(dataloader):
         (
             idx,
@@ -330,7 +336,6 @@ def add_foreground_score(
             is_main_object,
             image_path,
             all_masks,
-            # intersection_info
             metadata,
         ) = batch
 
@@ -340,11 +345,9 @@ def add_foreground_score(
 
         batch_size = len(idx)
 
-        # applied_mask = applied_mask.to(image.dtype)
         if not isinstance(
             applied_mask, (list, tuple)
         ):  # do nothing when mask is not applied yet
-            # applied_mask = applied_mask.float() # changed to convert in bboxed_dataset.py
             applied_mask = applied_mask.to(device)
         else:
             assert len(applied_mask) == 2  # (image, mask)
@@ -357,24 +360,14 @@ def add_foreground_score(
             model_outputs = model(applied_mask)
 
         for i in range(batch_size):
-            # print(metadata) # mtp
-            # if isinstance(metadata, list):
-            #     mask_value = metadata[i]["mask_value"].item()
-            # else:
-            #     mask_value = metadata["mask_value"][i].item()
             mask_value = metadata["mask_value"][i].item()
 
             for foreground_detector in foreground_detectors_to_process:
-                # # clip ensemble is only used for ens_entropy
-                # if foreground_detector != "ens_entropy" and isinstance(model, ClipEnsemble):
-                #     continue
-
                 res = res_per_fg_score[foreground_detector]
 
                 process_outputs(
                     i,
                     foreground_detector,
-                    # applied_mask,
                     model_outputs,
                     label,
                     mask_value,
@@ -384,11 +377,7 @@ def add_foreground_score(
                     model_name,
                     bbox,
                     mask,
-                    # uncertainty_estimators_dict=uncertainty_estimators_dict
                 )
-
-        # if len(res["source_image_path"]) > 300:
-        #     break # tmp 2
 
     model = original_model
     model.to("cpu")
@@ -578,7 +567,9 @@ def apply_dataset_specific_options(model, dataset_path):
     if isinstance(dataset_path, (tuple, list)):
         dataset_path, dataset_options = dataset_path
         mapper = dataset_options.get("mapper", None)
-        if mapper is not None:
+
+        # model can be None when we just want to parse dataset path
+        if mapper is not None and model is not None:
             # model = mapper(model)
             if isinstance(model, ClipEnsemble):
                 model = model  # don't wrap clip ensemble because we need it only for foreground score
@@ -628,6 +619,7 @@ def eval_models(
     batch_size=128,
     clean_dataloader_kwargs={"clean_type": "counter_animal"},
     recompute_all=False,
+    filter_keyword=None,
 ):
     """
     Evaluates machine learning models using specified datasets, transformations, and foreground (FG) detectors,
@@ -815,6 +807,7 @@ def eval_models(
                         fg_keyword=fg_keyword,
                         apply_mask=apply_mask,
                         eval_transform=transform_config,
+                        filter_keyword=filter_keyword,
                     )
 
                     full_keyword = f"{parquet_name}_{fg_keyword}@detector_{model_name}@model"

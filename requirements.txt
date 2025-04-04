@@ -13,3 +13,4 @@ git+https://github.com/openai/CLIP.git
 # from PyPi
 loralib
 pre-commit
+flask # for web app

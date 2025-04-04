@@ -65,32 +65,16 @@
                 "--dataset_name",
                 // "imagenet_d",
                 // "waterbirds",
-                // "urban_cars",
+                "urban_cars",
                 // "imagenet_9",
-                "counter_animal",
+                // "counter_animal",
                 "--mask_source",
-                "dino_ft",
+                // "dino_ft",
+                "cropformer",
+                "--filter_keyword",
+                "by_mask_size"
             ]
         },
-        // {
-        //     "name": "Python eval_spurious.py debug",
-        //     "type": "debugpy",
-        //     "request": "launch",
-        //     "program": "./scripts/eval_spurious.py",
-        //     "console": "integratedTerminal",
-        //     "justMyCode": true,
-        //     "args": [
-        //         "--dataset_name",
-        //         "imagenet_d",
-        //         "--mask_source",
-        //         "dino_ft",
-        //         "--result_path",
-        //         "/weka/oh/arubinstein17/github/OCCAM/data/results/eval_spurious/in_d_clip.pkl",
-        //         "--recompute_all",
-        //         "--clip",
-        //         "--siglip"
-        //     ]
-        // },
         {
             "name": "Python download_datasets_and_checkpoints.py",
             "type": "debugpy",
@@ -98,6 +82,29 @@
             "program": "./scripts/download_datasets_and_checkpoints.py",
             "console": "integratedTerminal",
             "justMyCode": true,
+        },
+        {
+            "name": "Python show_dataset via app.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "./web_pipelines/show_dataset/app.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--config_path",
+                "./configs/show_dataset/data_config.yaml",
+                "--path_within_config",
+                "data/dataset_configs/bboxed_dataset_urban_cars",
+                "--split",
+                "eval",
+                // "--hardcoded",
+                "--images_list",
+                "/0/074.jpg",
+                "--n_images",
+                "20",
+                "--data_kwargs",
+                "dataset_task=detection;foreground_keyword=ens_entropy;filter_keyword=by_mask_size",
+            ]
         },
     ]
 }

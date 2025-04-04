@@ -72,6 +72,7 @@ sys.path.pop(0)
 
 MIN_NON_ZERO_PIXELS = 100
 NUM_CORNER_PIXELS_FOR_BG = 5
+EXTENDED_BBOXED_DATASET_ITEM_LEN = 10
 EVAL_TRANSFORM_APPLIED_MASK_CONFIG = {
     "transforms_list": [
         "from_class-ToTensor",
@@ -232,6 +233,7 @@ class ImageNetBBoxAnnotationsV2(Dataset):
         images_list=None,
         foreground_keyword=None,
         apply_mask=True,
+        filter_keyword=None,
     ):
         super().__init__()
         # self.csv_path = csv_path
@@ -241,7 +243,7 @@ class ImageNetBBoxAnnotationsV2(Dataset):
             assert csv_path[-4:] == ".csv"
             self.csv = pd.read_csv(csv_path, na_values=None)
         self.image_transform = image_transform
-        self.mask_transform = mask_transform  # TODO(Alex |08.11.2024): should be renamed to common_transform and specific_transform
+        self.mask_transform = mask_transform  # TODO(Alex | 08.11.2024): should be renamed to common_transform and specific_transform
         self.full_transform = torchvision.transforms.Compose(
             [self.mask_transform, self.image_transform]
         )
@@ -282,6 +284,14 @@ class ImageNetBBoxAnnotationsV2(Dataset):
             self.csv = self.csv[
                 self.csv["source_image_path"].str.contains(pattern, regex=True)
             ]
+
+        if filter_keyword is not None:
+            assert filter_keyword in self.csv.columns, (
+                f"Filter keyword '{filter_keyword}' not found in the dataframe columns. "
+                f"Columns:\n {self.csv.columns}."
+            )
+            self.csv = self.csv[self.csv[filter_keyword] == 1]
+
         self.apply_mask = apply_mask
 
         # # for classification keep only image with target object
@@ -431,6 +441,16 @@ def try_to_get_from_cache(current_cache_path, idx, make_func, obj_type):
     else:
         res = make_func()
     return res
+
+
+def load_mask(mask_path, mask_value):
+    all_masks = torch.load(mask_path, weights_only=False)
+    assert all_masks.max() >= mask_value, (
+        f"mask_value: {mask_value} is greater than the maximum mask "
+        f"value: {all_masks.max()} for {mask_path}"
+    )
+    mask = all_masks == mask_value
+    return mask, all_masks
 
 
 def get_return_tuple(
@@ -627,12 +647,13 @@ def get_return_tuple(
         all_masks = None
         mask = bbox
     else:
-        all_masks = torch.load(mask_path, weights_only=False)
-        assert all_masks.max() >= mask_value, (
-            f"mask_value: {mask_value} is greater than the maximum mask "
-            f"value: {all_masks.max()} for {mask_path}"
-        )
-        mask = all_masks == mask_value
+        # all_masks = torch.load(mask_path, weights_only=False)
+        # assert all_masks.max() >= mask_value, (
+        #     f"mask_value: {mask_value} is greater than the maximum mask "
+        #     f"value: {all_masks.max()} for {mask_path}"
+        # )
+        # mask = all_masks == mask_value
+        mask, all_masks = load_mask(mask_path, mask_value)
         if len(mask.shape) == 3:
             mask = mask[
                 0
@@ -1244,6 +1265,7 @@ def make_bboxed_dataset_v2(
     images_list,
     foreground_keyword,
     apply_mask,
+    filter_keyword,
 ):
     # transform, mask_transform = make_image_mask_transforms(transform_config)
     common_transform, specific_transform = make_common_and_specific_transforms(
@@ -1259,6 +1281,7 @@ def make_bboxed_dataset_v2(
         images_list=images_list,
         foreground_keyword=foreground_keyword,
         apply_mask=apply_mask,
+        filter_keyword=filter_keyword,
     )
 
 
@@ -1368,6 +1391,7 @@ def make_bboxed_dataset_from_config(bboxed_dataset_config, transform_type):
     else:
         foreground_keyword = bboxed_dataset_config.get("foreground_keyword")
         apply_mask = bboxed_dataset_config.get("apply_mask", True)
+        filter_keyword = bboxed_dataset_config.get("filter_keyword")
         bboxed_dataset = make_bboxed_dataset_v2(
             csv_path=csv_path,
             transform_config=transform_config,
@@ -1377,6 +1401,7 @@ def make_bboxed_dataset_from_config(bboxed_dataset_config, transform_type):
             images_list=images_list,
             foreground_keyword=foreground_keyword,
             apply_mask=apply_mask,
+            filter_keyword=filter_keyword,
         )
     return bboxed_dataset
 
@@ -1470,37 +1495,30 @@ def make_bbox_dl_from_csv(
     eval_transform=None,
     apply_mask=True,
     images_list=None,
+    filter_keyword=None,
 ):
     if eval_transform is None:
         eval_transform = EVAL_TRANSFORM_APPLIED_MASK_CONFIG
-    # assert fg_keyword is not None
-    # df = pd.read_parquet(csv_path)
+
     bboxed_dataset_config = {
         "csv_path": csv_path,
         "dataset_task": dataset_task,
-        # "eval_transform": transform,
-        # "train_transform": transform,
         "train_val_split": 0.0,
-        # "eval_transform": EVAL_TRANSFORM_CONFIG
         "eval_transform": eval_transform,
         "extended_output": extended_output,
         "cache_path": None,
-        # "foreground_detector": fg_detector
         "apply_mask": apply_mask,
         "images_list": images_list,
     }
     if fg_keyword is not None:
         bboxed_dataset_config["foreground_keyword"] = fg_keyword
+    if filter_keyword is not None:
+        bboxed_dataset_config["filter_keyword"] = filter_keyword
+
     dataset = make_bboxed_dataset_from_config(
         bboxed_dataset_config, transform_type="eval"
     )
-    # bboxed_dataset_counter:
-    #   # csv_path: /home/oh/arubinstein17/github/densification/data/csvs/counter.parquet
-    #   csv_path: /home/oh/arubinstein17/github/densification/data/csvs/counter_debug.parquet
-    #   dataset_task: classification
-    #   eval_transform: copy@data/dataset_configs/bboxed_dataset/eval_transform
-    #   train_transform: copy@data/dataset_configs/bboxed_dataset/train_transform
-    #   train_val_split: 0.0
+
     return torch.utils.data.DataLoader(
         dataset,
         batch_size=batch_size,

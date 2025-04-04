@@ -10,23 +10,6 @@ import pandas as pd
 
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__))))
-# sys.path.insert(
-#     0,
-#     os.path.join(
-#         os.path.dirname(os.path.dirname(__file__)), "notebooks"
-#     )
-# )
-# from debiasing import (
-#     # COUNTER_PATH,
-#     # COMMON_PATH,
-#     # VIT_L_EVAL_TRANSFORM_CONFIG,
-#     make_df_with_foreground_scores,
-#     eval_models,
-#     # load_model,
-#     # add_lle_model
-# )
-
-# sys.path.pop(0)
 from occam.robust_classification.eval import (
     ENCODED_NAME_SEP,
     make_df_with_foreground_scores,
@@ -45,11 +28,6 @@ from occam.datasets.imagenet_d import (
     get_in_d_category_list,
 )
 from occam.datasets.imagenet_classes import get_in_classes_prompts
-
-# from occam.eval_clip.eval import (
-#     add_openai_clip_model,
-#     add_alpha_clip_model,
-# )
 from occam.datasets.waterbirds import (
     WATERBIRDS_PATHS,
     get_clip_wb_category_list,
@@ -65,9 +43,6 @@ from occam.datasets.imagenet_9 import (
     # get_in_9_category_list
 )
 
-# from occam.datasets.utils import (
-#     make_mapping_dict_generic_from_folder
-# )
 sys.path.pop(0)
 
 
@@ -114,6 +89,12 @@ def get_parser():
         "--ens_entropy",
         action="store_true",
         help="use ens entropy as foreground score",
+    )
+    parser.add_argument(
+        "--filter_keyword",
+        default=None,
+        help="filter keyword for filtering masks",
+        choices=[None, "by_mask_size"],
     )
     return parser
 
@@ -678,6 +659,7 @@ def main():
             batch_size=args.batch_size,
             dataset_name=args.dataset_name,
             recompute_all=args.recompute_all,
+            filter_keyword=args.filter_keyword,
         )
 
     if args.ens_entropy:
@@ -693,6 +675,7 @@ def main():
         batch_size=batch_size,
         clean_dataloader_kwargs=clean_dataloader_kwargs,  # attention to mappers
         recompute_all=args.recompute_all,
+        filter_keyword=args.filter_keyword,
     )
 
     df = convert_to_table(args.result_path, args.dataset_name)
