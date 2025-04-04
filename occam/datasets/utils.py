@@ -169,7 +169,6 @@ def make_to_classes_mapping(
     return ToClassesMapping(indices_for_category, aggregation_function)
 
 
-# ??
 # # TODO(Alex | 17.01.2024): make this non-experimental
 # # by directly accessing methods like "to" and "eval" from inner_object
 # # maybe don't even need to inherit from torch.nn.Module,
@@ -276,7 +275,8 @@ class ModelClassesWrapper(ModuleDelegatingWrapper):
         logits = self.inner_module(x)
         # probs = self.softmax(logits)
 
-        # TODO(Alex | 19.12.2024): make sure that applying mapper to logits instead of probs does not ??
+        # TODO(Alex | 19.12.2024): make sure that applying mapper to logits
+        # instead of probs does not cause problems
         return self.mapper(logits)
 
 

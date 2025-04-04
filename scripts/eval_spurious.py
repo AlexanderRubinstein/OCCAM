@@ -33,10 +33,12 @@ from occam.robust_classification.eval import (
     eval_models,
 )
 from occam.robust_classification.models import (
+    ModelBuilder,
     add_openai_clip_model,
     add_alpha_clip_model,
     add_openclip_model,
-    make_clip_ensemble,
+    # make_clip_ensemble,
+    get_clip_ensemble_builder,
 )
 from occam.datasets.imagenet_d import (
     IN_D_PATH,
@@ -635,10 +637,13 @@ def main():
 
     if args.ens_entropy:
         assert args.clip
-        clip_ensemble = make_clip_ensemble(_category_list)
-        _models_dict["clip_ensemble"] = (
-            clip_ensemble,
-            clip_ensemble.preprocess,
+        # clip_ensemble = make_clip_ensemble(_category_list)
+        # _models_dict["clip_ensemble"] = (
+        #     clip_ensemble,
+        #     clip_ensemble.preprocess,
+        # )
+        _models_dict["clip_ensemble"] = ModelBuilder(
+            get_clip_ensemble_builder(_category_list)
         )
         # raise NotImplementedError("Do we return preprocess as second arg for others?")
 

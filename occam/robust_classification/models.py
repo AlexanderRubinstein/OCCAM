@@ -20,32 +20,121 @@ from occam.submodules.alpha_clip_wrapper import (
 sys.path.pop(0)
 
 
+class ModelBuilder:
+    def __init__(self, build_model):
+        self.build_model = build_model
+
+    def build(self):
+        return self.build_model()
+
+
+def add_clip_model(
+    model_id,
+    category_list,
+    models_dict,
+    # name_prefix="clip_openai_",
+    clip_type="open_ai",
+    pretrained=None,
+):
+    if clip_type in ["open_ai", "open_clip"]:
+        if clip_type == "open_ai":
+            assert pretrained is None
+            name_prefix = "clip_openai_"
+        else:
+            assert clip_type == "open_clip"
+            name_prefix = f"clip_openclip_{pretrained}_"
+
+        def model_builder_clip():
+            model, preprocess, text_features = make_clip_model(
+                model_id=model_id,
+                pretrained=pretrained,
+                clip_type=clip_type,
+                class_prompts=category_list,
+            )
+            wrapped_model = ClipWrapper(model, text_features)
+            return (wrapped_model, preprocess)
+
+        model_builder = model_builder_clip
+    else:
+        assert clip_type == "alpha_clip"
+        assert pretrained is None
+        name_prefix = "alpha_clip_"
+
+        def model_builder_alpha_clip():
+            wrapped_model = make_alpha_clip_model(
+                model_id=model_id, category_list=category_list
+            )
+
+            # wrapped_model = model
+            preprocess = ALPHA_CLIP_IMAGE_PREPROCESS_CONFIG
+            return (wrapped_model, preprocess)
+
+        model_builder = model_builder_alpha_clip
+        # models_dict["alpha_clip_" + model_id] = (
+        #     model,
+        #     ALPHA_CLIP_IMAGE_PREPROCESS_CONFIG,
+        # )
+    # models_dict[name_prefix + model_id] = (wrapped_model, preprocess)
+    models_dict[name_prefix + model_id] = ModelBuilder(model_builder)
+
+
 def add_openai_clip_model(
     model_id, category_list, models_dict, name_prefix="clip_openai_"
 ):
-    model, preprocess, text_features = make_clip_model(
+    add_clip_model(
         model_id=model_id,
-        pretrained=None,
+        category_list=category_list,
+        models_dict=models_dict,
         clip_type="open_ai",
-        class_prompts=category_list,
+        pretrained=None,
     )
-    wrapped_model = ClipWrapper(model, text_features)
-    models_dict[name_prefix + model_id] = (wrapped_model, preprocess)
+    # model, preprocess, text_features = make_clip_model(
+    #     model_id=model_id,
+    #     pretrained=None,
+    #     clip_type="open_ai",
+    #     class_prompts=category_list,
+    # )
+    # wrapped_model = ClipWrapper(model, text_features)
+    # models_dict[name_prefix + model_id] = (wrapped_model, preprocess)
 
 
 def add_openclip_model(
     model_id, category_list, models_dict, pretrained, name_prefix=None
 ):
-    if name_prefix is None:
-        name_prefix = f"clip_openclip_{pretrained}_"
-    model, preprocess, text_features = make_clip_model(
+    add_clip_model(
         model_id=model_id,
-        pretrained=pretrained,
+        category_list=category_list,
+        models_dict=models_dict,
         clip_type="open_clip",
-        class_prompts=category_list,
+        pretrained=pretrained,
     )
-    wrapped_model = ClipWrapper(model, text_features)
-    models_dict[name_prefix + model_id] = (wrapped_model, preprocess)
+    # if name_prefix is None:
+    #     name_prefix = f"clip_openclip_{pretrained}_"
+    # model, preprocess, text_features = make_clip_model(
+    #     model_id=model_id,
+    #     pretrained=pretrained,
+    #     clip_type="open_clip",
+    #     class_prompts=category_list,
+    # )
+    # wrapped_model = ClipWrapper(model, text_features)
+    # models_dict[name_prefix + model_id] = (wrapped_model, preprocess)
+
+
+def add_alpha_clip_model(model_id, category_list, models_dict):
+    add_clip_model(
+        model_id=model_id,
+        category_list=category_list,
+        models_dict=models_dict,
+        clip_type="alpha_clip",
+        pretrained=None,
+    )
+    # model = make_alpha_clip_model(
+    #     model_id=model_id, category_list=category_list
+    # )
+    # models_dict["alpha_clip_" + model_id] = (
+    #     model,
+    #     ALPHA_CLIP_IMAGE_PREPROCESS_CONFIG,
+    # )
 
 
 def make_clip_model(
@@ -154,9 +243,17 @@ def clip_models_with_same_preprocess(category_list):
     # clip_openclip_laion400m_e31_ViT-L-14
     # clip_openclip_laion400m_e32_ViT-L-14
 
-    # model_list = []
+    models_list = []
     transform = None
-    for model_id, (model, preprocess) in models_dict.items():
+    for model_id, builder in models_dict.items():
+        assert isinstance(builder, ModelBuilder)
+
+        model, preprocess = builder.build()
+        # if isinstance(builder, ModelBuilder):
+        #     model, preprocess = builder.build()
+        # else:
+        #     model, preprocess = builder
+
         if transform is None:
             transform = preprocess
         else:
@@ -164,24 +261,19 @@ def clip_models_with_same_preprocess(category_list):
             assert str(transform) == str(
                 preprocess
             ), "transforms must be the same"
-        # model_list.append((model_id, model))
+        models_list.append(model)
     assert transform is not None
-    return models_dict, transform
+    return models_list, transform
 
 
 class ClipEnsemble(torch.nn.Module):
     def __init__(self, category_list):
         super().__init__()
-        models_dict, preprocess = clip_models_with_same_preprocess(
+        models_list, preprocess = clip_models_with_same_preprocess(
             category_list
         )
         self.preprocess = preprocess
-        self.models = torch.nn.ModuleList(
-            [
-                model_and_transform[0]
-                for model_and_transform in models_dict.values()
-            ]
-        )
+        self.models = torch.nn.ModuleList(models_list)
 
     def forward(self, x):
         outputs_list = [model(x) for model in self.models]
@@ -195,6 +287,14 @@ class ClipEnsemble(torch.nn.Module):
 def make_clip_ensemble(category_list):
     clip_ensemble = ClipEnsemble(category_list)
     return clip_ensemble
+
+
+def get_clip_ensemble_builder(category_list):
+    def clip_ensemble_builder():
+        clip_ensemble = make_clip_ensemble(category_list)
+        return clip_ensemble, clip_ensemble.preprocess
+
+    return clip_ensemble_builder
 
 
 def get_text_features(model, tokenizer, class_prompts, apply_per_prompt=False):
@@ -226,11 +326,11 @@ def get_text_probs(model, image, text_features, subset_tensor):
     return text_probs
 
 
-def add_alpha_clip_model(model_id, category_list, models_dict):
-    model = make_alpha_clip_model(
-        model_id=model_id, category_list=category_list
-    )
-    models_dict["alpha_clip_" + model_id] = (
-        model,
-        ALPHA_CLIP_IMAGE_PREPROCESS_CONFIG,
-    )
+# def add_alpha_clip_model(model_id, category_list, models_dict):
+#     model = make_alpha_clip_model(
+#         model_id=model_id, category_list=category_list
+#     )
+#     models_dict["alpha_clip_" + model_id] = (
+#         model,
+#         ALPHA_CLIP_IMAGE_PREPROCESS_CONFIG,
+#     )

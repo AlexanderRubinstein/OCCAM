@@ -79,33 +79,6 @@ class ImageNet9Dataset(torch.utils.data.Dataset):
 
         self.transforms = transform
 
-        # with open(IMAGENET_9_MAP_JSON) as f:
-        #     dict_in2in9 = json.load(f)
-
-        # _, _, category2id = get_in_d_category_list()
-
-        # category2id_patched = {
-        #     k.replace(' ', '_').replace('(', '').replace(')', ''): v
-        #         for k, v
-        #             in category2id.items()
-        # }
-
-        # categories_list = os.listdir(self.test_path)
-        # int_to_category = {
-        #     int(category.split('_')): category
-        #         for category
-        #             in (categories_list)
-        # }
-
-        # ?? map numbers to category names
-        # ?? many to 1 relationship
-        #         dict_in9_to_in = {
-        #             int_to_category[v]: k
-        #                 for k, v
-        #                     in dict_in2in9.items()
-        #                         if v != -1
-        #         }
-
         categories_list = os.listdir(self.test_path)
 
         category_to_label = {

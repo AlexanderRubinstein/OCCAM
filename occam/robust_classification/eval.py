@@ -63,7 +63,10 @@ from occam.datasets.bboxed_dataset import (
 )
 from occam.robust_classification.utils import get_probs
 from occam.datasets.common import make_dataloader
-from occam.robust_classification.models import ClipEnsemble, make_clip_ensemble
+from occam.robust_classification.models import (
+    ClipEnsemble,
+    ModelBuilder,
+)
 from occam.ood_detection.uncertainty_scores import (
     ens_entropy_per_sample,
 )
@@ -555,6 +558,10 @@ def check_model_specific_options(model, model_name):
     # is_clip = "lip" in model_name.lower()
     apply_mask = True
     # if is_clip:
+
+    if isinstance(model, ModelBuilder):
+        model = model.build()
+
     if isinstance(model, (tuple, list)):
         assert len(model) == 2
         model, transform = model
