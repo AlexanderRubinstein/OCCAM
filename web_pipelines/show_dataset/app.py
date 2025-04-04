@@ -157,6 +157,7 @@ def sample_images_from_dataset():
         DATASET.mode = dataset_config.get("visualization_mode")
         NUM_IMAGES_TO_SHOW = min(len(DATASET), NUM_IMAGES_TO_SHOW)
 
+    assert len(DATASET) > 0, "Dataset is empty"
     subsampled_indices = (
         randomly_subsample_indices_uniformly(len(DATASET), NUM_IMAGES_TO_SHOW)
         .numpy()

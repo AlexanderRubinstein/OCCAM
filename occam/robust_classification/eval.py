@@ -5,6 +5,7 @@ from tqdm import tqdm
 import pandas as pd
 import torchvision
 import numpy as np
+from scipy import ndimage
 
 
 from stuned.utility.utils import (
@@ -63,6 +64,7 @@ from occam.datasets.bboxed_dataset import (
     load_mask,
 )
 from occam.robust_classification.utils import get_probs
+from occam.robust_classification.masking import mask2chw
 from occam.datasets.common import make_dataloader
 from occam.robust_classification.models import (
     ClipEnsemble,
@@ -104,7 +106,11 @@ EVAL_TRANSFORM_APPLIED_MASK_CONFIG = {
     },
 }
 ROUND_DECIMALS = 3
-AREA_THRESHOLD = 1000
+AREA_THRESHOLD = 2000
+BORDER_TOUCH_THRESHOLD = 200
+BORDER_VS_AREA_RATIO = 0.01
+NUM_CONNECTED_COMPONENTS_THRESHOLD = 10
+ASPECT_RATIO_THRESHOLD = 6
 
 
 def extract_el_if_tuple(obj, i=0):
@@ -167,6 +173,7 @@ def make_df_with_foreground_scores(
             separate_masks_folder=separate_masks_folder,
             source_df_path=source_df_path,
             make_mapping_dict_func=make_mapping_dict_func,
+            filter_keyword=filter_keyword,
         )
     else:
         print(f"Source df already exists: {source_df_path}")
@@ -176,9 +183,6 @@ def make_df_with_foreground_scores(
         convert_label = convert_urban_cars_label
     else:
         convert_label = None
-
-    if filter_keyword is not None:
-        filter_df(source_df_path, filter_keyword)
 
     for model_name in models_dict.keys():
         add_foreground_score(
@@ -191,7 +195,7 @@ def make_df_with_foreground_scores(
             num_workers=num_workers,
             convert_label=convert_label,
             recompute_all=recompute_all,
-            # filter_keyword=filter_keyword,
+            filter_keyword=filter_keyword,
         )
 
 
@@ -202,6 +206,7 @@ def make_source_df_per_dataset(
     separate_masks_folder,
     source_df_path,
     make_mapping_dict_func=make_mapping_dict_counter_animal_,
+    filter_keyword=None,
 ):
     print("making mapping dict")
     mapping_dict = make_mapping_dict_func(
@@ -211,30 +216,189 @@ def make_source_df_per_dataset(
     source_df = make_source_df(mapping_dict)
 
     extracted_source_df_path = extract_el_if_tuple(source_df_path, i=0)
+
+    if filter_keyword is not None:
+        print(
+            f"Filtering df: {extracted_source_df_path} based on {filter_keyword}"
+        )
+        source_df = filter_df(source_df, filter_keyword)
     to_parquet(source_df, extracted_source_df_path)
 
 
-def filter_df(df_path, filter_keyword):
-    _, _, df_path = apply_dataset_specific_options(None, df_path)
-    print(f"Filtering df: {df_path} based on {filter_keyword}")
-    df = pd.read_parquet(df_path)
-    df.loc[:, filter_keyword] = 1  # column of 1s
-    if filter_keyword == "by_mask_size":
-        # df = df[df["mask_size"] > 0]
-        # iterate over all rows, load masks - compute area - filter
-        for idx, row in tqdm(df.iterrows(), total=len(df)):
-            mask, _ = load_mask(row["mask_path"], row["mask_value"])
-            assert (
-                len(mask.shape) == 2
-            ), f"Mask shape: {mask.shape} for {row['mask_path']} but should be 2D"
+def count_number_connected_components(mask):
+    """
+    Count the number of connected components in a binary mask.
 
-            mask_area = mask.sum()
-            if mask_area < AREA_THRESHOLD:
-                df.loc[idx, filter_keyword] = 0
-    else:
-        assert filter_keyword is None
-    to_parquet(df, df_path)
+    Parameters:
+    -----------
+    mask : numpy.ndarray
+        Binary mask with values 0 or 1.
+
+    Returns:
+    --------
+    int
+        Number of connected components in the mask.
+    """
+    # Ensure the mask is binary (0s and 1s)
+    binary_mask = (mask > 0).astype(np.uint8)
+
+    # Label connected components
+    labeled_array, num_features = ndimage.label(binary_mask)
+
+    return num_features
+
+
+# def filter_df(df_path, filter_keyword):
+def filter_df(df, filter_keyword):
+    def populate_top_areas_dict(
+        top_areas_dict, source_image_path, all_masks, top_k
+    ):
+        cur_areas = {}
+        for cur_mask_value in np.unique(all_masks):
+            # mask, _ = load_mask(mask_path, mask_value)
+            cur_mask_value = int(cur_mask_value)
+            mask_area = (all_masks == cur_mask_value).sum()
+            cur_areas[cur_mask_value] = mask_area
+        # Get top k mask values by area
+        top_k_mask_values = sorted(
+            cur_areas.items(), key=lambda x: x[1], reverse=True
+        )[:top_k]
+        top_k_mask_values = {k for k, v in top_k_mask_values}
+        top_areas_dict[source_image_path] = top_k_mask_values
+
+    def add_all_zeros_mask(
+        row, filter_keyword, all_masks, mask_path, rows_to_add, filtered_count
+    ):
+        all_zeros_masks = np.zeros_like(all_masks)
+        assert mask_path.endswith(
+            ".mask"
+        ), f"mask_path does end with .mask: {mask_path}"
+        all_zeros_masks_path = mask_path.replace(".mask", "_all_zeros.mask")
+        torch.save(all_zeros_masks, all_zeros_masks_path)
+        row_to_add = row.copy()
+        row_to_add["mask_path"] = all_zeros_masks_path
+        row_to_add["mask_value"] = 0
+        label_keys = [key for key in row.keys() if "_label" in key]
+        for label_key in label_keys:
+            row_to_add[label_key] = 1
+        row_to_add[filter_keyword] = 1
+        rows_to_add.append(row_to_add)
+        filtered_count -= 1
+        return filtered_count
+
+    if filter_keyword in df.columns:
+        print(f"{filter_keyword} is already in df, skipping it.")
+        return
+    df.loc[:, filter_keyword] = 1  # column of 1s
+    filtered_count = 0
+
+    filter_names = filter_keyword.split("+")
+
+    top_areas_dict = None
+    top_k = None
+
+    rows_to_add = []
+    for idx, row in tqdm(df.iterrows(), total=len(df)):
+        # if not "Pomarine_Jaeger_0056" in row["source_image_path"]:
+        #     continue
+        # # if not (row["mask_value"] == 12 or row["mask_value"] == 2):
+        # if not (row["mask_value"] == 11 or row["mask_value"] == 2):
+        #     continue
+        # print("Please remove above")
+        mask_path = row["mask_path"]
+        mask, all_masks = load_mask(mask_path, row["mask_value"])
+        source_image_path = row["source_image_path"]
+        assert (
+            len(mask.shape) == 2
+        ), f"Mask shape: {mask.shape} for {row['mask_path']} but should be 2D"
+
+        to_filter = False
+
+        border_touch = compute_border_touch(mask)
+        mask_area = mask.sum()
+        for filter_name in filter_names:
+            if to_filter:
+                continue
+
+            if filter_name == "by_mask_size":
+                if mask_area < AREA_THRESHOLD:
+                    to_filter = True
+            elif filter_name == "by_aspect_ratio":
+                _, h, w = mask2chw(mask[..., None], enforce_square_shape=False)
+                if max(h / w, w / h) > ASPECT_RATIO_THRESHOLD:
+                    to_filter = True
+            elif filter_name == "by_border_touch":
+                if border_touch > BORDER_TOUCH_THRESHOLD:
+                    to_filter = True
+
+            elif filter_name == "by_border_vs_area":
+                if border_touch / mask_area > BORDER_VS_AREA_RATIO:
+                    to_filter = True
+            elif filter_name == "by_num_connected_components":
+                num_connected_components = count_number_connected_components(
+                    mask
+                )
+                if (
+                    num_connected_components
+                    > NUM_CONNECTED_COMPONENTS_THRESHOLD
+                ):
+                    to_filter = True
+            elif "by_top_area" in filter_name:
+                if top_areas_dict is None:
+                    top_areas_dict = {}
+                if top_k is None:
+                    assert (
+                        "@" in filter_name
+                    ), f"filter_name must contain @: {filter_name}"
+                    top_k = int(filter_name.split("@")[1])
+
+                if source_image_path not in top_areas_dict:
+                    populate_top_areas_dict(
+                        top_areas_dict, source_image_path, all_masks, top_k
+                    )
+
+                if row["mask_value"] not in top_areas_dict[source_image_path]:
+                    to_filter = True
+            else:
+                raise_unknown("Unknown filter name", filter_name, "filter_df")
+
+        if to_filter:
+            filtered_count += 1
+            df.loc[idx, filter_keyword] = 0
+            if (
+                sum(
+                    df[df["source_image_path"] == source_image_path][
+                        filter_keyword
+                    ]
+                )
+                == 0
+            ):
+                print(
+                    f"All masks are filtered for {filter_keyword} for {source_image_path}"
+                    f"using the whole image as mask for it"
+                )
+                filtered_count = add_all_zeros_mask(
+                    row,
+                    filter_keyword,
+                    all_masks,
+                    mask_path,
+                    rows_to_add,
+                    filtered_count,
+                )
+
+    for row in rows_to_add:
+        df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+
+    print(f"Filtered {filtered_count} / {len(df)} masks")
+    return df
     # return df
+
+
+def compute_border_touch(mask):
+    # compute border touch
+    # mask is a binary mask
+    # return the number of pixels on the border
+    return mask[0].sum() + mask[-1].sum() + mask[:, 0].sum() + mask[:, -1].sum()
 
 
 def make_keyword(foreground_detector, model_name):
@@ -257,7 +421,7 @@ def add_foreground_score(
     num_workers=12,
     convert_label=None,
     recompute_all=False,
-    # filter_keyword=None,
+    filter_keyword=None,
 ):
     model = models_dict[model_name]
 
@@ -282,8 +446,6 @@ def add_foreground_score(
     model.eval()
     model.to(device)
 
-    # filter_keyword is None, because we want to have scores for all masks
-    # to avoid clashes when mask is filtered on this stage but not filtered on eval stage
     dataloader = make_bbox_dl_from_csv(
         source_df_path,
         extended_output=True,
@@ -291,7 +453,7 @@ def add_foreground_score(
         num_workers=num_workers,
         eval_transform=transform,
         apply_mask=apply_mask,
-        filter_keyword=None,
+        filter_keyword=filter_keyword,
     )
     res_per_fg_score = {}
     foreground_detectors_to_process = (
@@ -683,6 +845,7 @@ def eval_models(
             )
             for group_id in range(len(WATERBIRDS_PATHS))
         ]
+
         only_fg_wb_group_paths = [
             (
                 f"waterbirds_group_{group_id}_only_fg",
@@ -690,6 +853,7 @@ def eval_models(
             )
             for group_id in range(len(WATERBIRDS_ONLY_FG_PATHS))
         ]
+
         dataset_name_path_list = (
             standard_wb_group_paths + only_fg_wb_group_paths
         )

@@ -259,20 +259,7 @@ class ImageNetBBoxAnnotationsV2(Dataset):
             self.current_cache_path = None
         self.allow_bbox_shape_mismatch = allow_bbox_shape_mismatch
 
-        if foreground_keyword is not None:
-            label_key = f"{foreground_keyword}_label"
-            assert (
-                label_key in self.csv.columns
-            ), f"Foreground keyword '{label_key}' not found in the CSV columns. Columns:\n {self.csv.columns}."
-            # print(label_key) # tmp
-            self.csv["main_object_label"] = self.csv[label_key]
-            self.csv["metadata"] = self.csv[f"{foreground_keyword}_metadata"]
-
-        if self.dataset_task == "classification":
-            self.csv = self.csv[self.csv["main_object_label"] == 1]
-        else:
-            assert self.dataset_task == "detection"
-
+        # filter by image names
         if images_list is not None:
             # self.active_indices = []
             pattern = "|".join(
@@ -285,12 +272,28 @@ class ImageNetBBoxAnnotationsV2(Dataset):
                 self.csv["source_image_path"].str.contains(pattern, regex=True)
             ]
 
+        # filter by filtering heuristics
         if filter_keyword is not None:
             assert filter_keyword in self.csv.columns, (
                 f"Filter keyword '{filter_keyword}' not found in the dataframe columns. "
                 f"Columns:\n {self.csv.columns}."
             )
             self.csv = self.csv[self.csv[filter_keyword] == 1]
+
+        # is_main_object is the one that has the highest foreground score
+        if foreground_keyword is not None:
+            label_key = f"{foreground_keyword}_label"
+            assert (
+                label_key in self.csv.columns
+            ), f"Foreground keyword '{label_key}' not found in the CSV columns. Columns:\n {self.csv.columns}."
+
+            self.csv["main_object_label"] = self.csv[label_key]
+            self.csv["metadata"] = self.csv[f"{foreground_keyword}_metadata"]
+
+        if self.dataset_task == "classification":
+            self.csv = self.csv[self.csv["main_object_label"] == 1]
+        else:
+            assert self.dataset_task == "detection"
 
         self.apply_mask = apply_mask
 

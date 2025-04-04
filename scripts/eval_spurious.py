@@ -94,7 +94,6 @@ def get_parser():
         "--filter_keyword",
         default=None,
         help="filter keyword for filtering masks",
-        choices=[None, "by_mask_size"],
     )
     return parser
 
@@ -400,7 +399,7 @@ def main():
         _df_path = os.path.join(
             parquets_base_dir,
             args.mask_source,
-            f"source_urban_cars_{args.mask_source}.parquet",
+            f"source_urban_cars_{args.mask_source}_{args.filter_keyword}.parquet",
         )
 
         _images_path = URBAN_CARS_PATH
@@ -450,7 +449,7 @@ def main():
         _df_path = os.path.join(
             parquets_base_dir,
             args.mask_source,
-            f"source_in_val_with_bboxes_{args.mask_source}.parquet",
+            f"source_in_val_with_bboxes_{args.mask_source}_{args.filter_keyword}.parquet",
         )
         parquets[args.dataset_name] = (_df_path, _parquet_kwargs)
 
@@ -483,7 +482,7 @@ def main():
             _df_path = os.path.join(
                 parquets_base_dir,
                 args.mask_source,
-                f"source_counter_animal_{split}_{args.mask_source}.parquet",
+                f"source_counter_animal_{split}_{args.filter_keyword}.parquet",
             )
             parquets[split] = (_df_path, _parquet_kwargs)
             split_images_masks.append(
@@ -503,7 +502,7 @@ def main():
                 os.path.join(
                     parquets_base_dir,
                     args.mask_source,
-                    f"source_waterbirds_group_{group_id}_{args.mask_source}.parquet",
+                    f"source_waterbirds_group_{group_id}_{args.filter_keyword}.parquet",
                 ),
                 _parquet_kwargs,
             )
@@ -557,7 +556,7 @@ def main():
             os.path.join(
                 parquets_base_dir,
                 args.mask_source,
-                f"source_imagenet_9_mix_rand_{args.mask_source}.parquet",
+                f"source_imagenet_9_mix_rand_{args.mask_source}_{args.filter_keyword}.parquet",
             ),
             _parquet_kwargs,
         )
@@ -595,7 +594,7 @@ def main():
             os.path.join(
                 parquets_base_dir,
                 args.mask_source,
-                f"source_imagenet_d_bg_{args.mask_source}.parquet",
+                f"source_imagenet_d_bg_{args.mask_source}_{args.filter_keyword}.parquet",
             ),
             _parquet_kwargs,
         )
