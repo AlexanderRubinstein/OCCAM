@@ -42,6 +42,11 @@ from occam.datasets.imagenet_9 import (
     IMAGENET_9_PATH,
     # get_in_9_category_list
 )
+from occam.datasets.utils import (
+    DATA_PATH,
+    CSV_PATH,
+    DATASETS_PATH,
+)
 
 sys.path.pop(0)
 
@@ -327,7 +332,6 @@ def add_clip_models(models_dict, category_list, dataset_name, siglip=False):
             models_dict=models_dict,
             pretrained="webli",
         )
-        print("Uncomment 3 above pls")
         add_openclip_model(
             model_id="ViT-SO400M-14-SigLIP-384",
             category_list=category_list,
@@ -351,9 +355,10 @@ def main():
 
     batch_size = args.batch_size
 
-    data_path = os.path.join(get_project_root_path(), "data")
+    # data_path = os.path.join(get_project_root_path(), "data")
+    data_path = DATA_PATH
 
-    parquets_base_dir = os.path.join(data_path, "csvs")
+    parquets_base_dir = CSV_PATH
 
     masks_base_dir = os.path.join(data_path, "masks")
 
@@ -361,7 +366,7 @@ def main():
 
     if args.dataset_name == "counter_animal_gap":
         fg_detectors = ["oracle"]
-    elif args.dataset_name == "in_val_with_bboxes":
+    elif args.dataset_name == "in_val":
         fg_detectors = ["oracle", "max_prob", "bbox_iou"]
     else:
         fg_detectors = ["oracle", "max_prob"]
@@ -416,7 +421,7 @@ def main():
         )
         parquets[args.dataset_name] = (_df_path, _parquet_kwargs)
 
-    elif args.dataset_name == "in_val_with_bboxes":
+    elif args.dataset_name == "in_val":
         if args.clip:
             _category_list = get_in_classes_prompts()
 
@@ -426,13 +431,13 @@ def main():
         clean_dataloader_kwargs["clean_type"] = "in_val"
 
         _separate_masks_folder = os.path.join(
-            separate_masks_base_dir, args.mask_source, "in_val_with_bboxes"
+            separate_masks_base_dir, args.mask_source, "in_val"
         )
-        _images_path = "/mnt/lustre/datasets/ImageNet2012/val/"
+        _images_path = os.path.join(DATASETS_PATH, "ImageNet-val")
         _masks_path = os.path.join(
-            masks_base_dir, f"in_val_masks_{args.mask_source}.pkl"
+            masks_base_dir, args.mask_source, f"in_val_masks.pkl"
         )
-        _bboxes_path = os.path.join(data_path, "bboxes_annotations", "val")
+        _bboxes_path = os.path.join(data_path, "bboxes_annotations", "in_val")
         _masks_path = (_masks_path, _bboxes_path)
         split_images_masks.append(
             (
@@ -445,7 +450,7 @@ def main():
         _df_path = os.path.join(
             parquets_base_dir,
             args.mask_source,
-            f"source_in_val_with_bboxes_{args.mask_source}_{args.filter_keyword}.parquet",
+            f"source_in_val_{args.filter_keyword}.parquet",
         )
         parquets[args.dataset_name] = (_df_path, _parquet_kwargs)
 
@@ -493,6 +498,9 @@ def main():
             raise NotImplementedError()
 
         for group_id in range(len(WATERBIRDS_PATHS)):
+            # if group_id != 3 and group_id != 2:
+            #     continue
+            # print(f"Uncomment above to run for group {group_id}")
             parquet_name = f"waterbirds_group_{group_id}"
             parquets[parquet_name] = (
                 os.path.join(
@@ -662,6 +670,7 @@ def main():
             "clip_ensemble"
         )  # was needed only to compute ens_entropy scores
 
+    assert len(parquets) > 0, "No parquets are generated"
     eval_models(
         parquets=parquets,
         models=_models_dict,
@@ -696,7 +705,7 @@ def convert_to_table(result_path, dataset_name):
         "counter_animal",
         "imagenet_d",
         "imagenet_9",
-        "in_val_with_bboxes",
+        "in_val",
     ]:
         df_dict = {key: [value] for key, value in res_dict.items()}
 

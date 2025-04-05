@@ -418,7 +418,7 @@ def prepare_applied_mask_maker(image, mask):
         return apply_visual_prompts(
             image,
             mask,
-            visual_prompt_type=("naive_gray", "rectangle_crop_resize"),
+            visual_prompt_type=("rectangle_crop_resize", "naive_gray"),
             enforce_square_shape=False,
         ).squeeze(0)
 

@@ -96,6 +96,11 @@ def parse_args():
         type=str,
         help="Additional kwargs for data_config",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Run in debug mode to prevent app from running twice",
+    )
     return parser.parse_args()
 
 
@@ -416,7 +421,7 @@ def main():
             data_config[key] = value
 
     prepare_images(data_config, args.split, logger)
-    app.run(debug=True)
+    app.run(debug=args.debug)
 
 
 def split_in_lines(text, max_line_length, separator=" "):

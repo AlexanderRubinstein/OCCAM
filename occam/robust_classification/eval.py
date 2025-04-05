@@ -64,7 +64,10 @@ from occam.datasets.bboxed_dataset import (
     load_mask,
 )
 from occam.robust_classification.utils import get_probs
-from occam.robust_classification.masking import mask2chw
+from occam.robust_classification.masking import (
+    mask2chw,
+    is_background,
+)
 from occam.datasets.common import make_dataloader
 from occam.robust_classification.models import (
     ClipEnsemble,
@@ -106,11 +109,13 @@ EVAL_TRANSFORM_APPLIED_MASK_CONFIG = {
     },
 }
 ROUND_DECIMALS = 3
-AREA_THRESHOLD = 2000
+AREA_THRESHOLD = 0.001
 BORDER_TOUCH_THRESHOLD = 200
 BORDER_VS_AREA_RATIO = 0.01
-NUM_CONNECTED_COMPONENTS_THRESHOLD = 10
+NUM_CONNECTED_COMPONENTS_THRESHOLD = 30
 ASPECT_RATIO_THRESHOLD = 6
+NEW_MASK_VALUE = 0.5
+BACKGROUND_THRESHOLD = 3
 
 
 def extract_el_if_tuple(obj, i=0):
@@ -269,7 +274,7 @@ def filter_df(df, filter_keyword):
     def add_all_zeros_mask(
         row, filter_keyword, all_masks, mask_path, rows_to_add, filtered_count
     ):
-        all_zeros_masks = np.zeros_like(all_masks)
+        all_zeros_masks = np.zeros_like(all_masks) + NEW_MASK_VALUE
         assert mask_path.endswith(
             ".mask"
         ), f"mask_path does end with .mask: {mask_path}"
@@ -277,9 +282,11 @@ def filter_df(df, filter_keyword):
         torch.save(all_zeros_masks, all_zeros_masks_path)
         row_to_add = row.copy()
         row_to_add["mask_path"] = all_zeros_masks_path
-        row_to_add["mask_value"] = 0
+        row_to_add["mask_value"] = NEW_MASK_VALUE
         label_keys = [key for key in row.keys() if "_label" in key]
         for label_key in label_keys:
+            if label_key == "classification_label":
+                continue
             row_to_add[label_key] = 1
         row_to_add[filter_keyword] = 1
         rows_to_add.append(row_to_add)
@@ -299,15 +306,16 @@ def filter_df(df, filter_keyword):
 
     rows_to_add = []
     for idx, row in tqdm(df.iterrows(), total=len(df)):
-        # if not "Pomarine_Jaeger_0056" in row["source_image_path"]:
+        # if not "mDbAS" in row["source_image_path"]:
         #     continue
-        # # if not (row["mask_value"] == 12 or row["mask_value"] == 2):
-        # if not (row["mask_value"] == 11 or row["mask_value"] == 2):
+        # if not (row["mask_value"] == 12 or row["mask_value"] == 2):
+        # if not (row["mask_value"] == 0):
         #     continue
         # print("Please remove above")
         mask_path = row["mask_path"]
         mask, all_masks = load_mask(mask_path, row["mask_value"])
         source_image_path = row["source_image_path"]
+
         assert (
             len(mask.shape) == 2
         ), f"Mask shape: {mask.shape} for {row['mask_path']} but should be 2D"
@@ -315,13 +323,18 @@ def filter_df(df, filter_keyword):
         to_filter = False
 
         border_touch = compute_border_touch(mask)
-        mask_area = mask.sum()
+        mask_area = mask.sum() / (mask.shape[0] * mask.shape[1])
         for filter_name in filter_names:
             if to_filter:
                 continue
 
             if filter_name == "by_mask_size":
                 if mask_area < AREA_THRESHOLD:
+                    to_filter = True
+            elif filter_name == "by_background":
+                if is_background(
+                    mask, to_extract=False, threshold=BACKGROUND_THRESHOLD
+                ):
                     to_filter = True
             elif filter_name == "by_aspect_ratio":
                 _, h, w = mask2chw(mask[..., None], enforce_square_shape=False)
@@ -374,7 +387,7 @@ def filter_df(df, filter_keyword):
                 == 0
             ):
                 print(
-                    f"All masks are filtered for {filter_keyword} for {source_image_path}"
+                    f"All masks are filtered for {filter_keyword} for {source_image_path} "
                     f"using the whole image as mask for it"
                 )
                 filtered_count = add_all_zeros_mask(
@@ -844,6 +857,7 @@ def eval_models(
                 (WATERBIRDS_PATHS[group_id], clean_dataloader_kwargs),
             )
             for group_id in range(len(WATERBIRDS_PATHS))
+            # if group_id == 3 or group_id == 2
         ]
 
         only_fg_wb_group_paths = [
@@ -852,7 +866,9 @@ def eval_models(
                 (WATERBIRDS_ONLY_FG_PATHS[group_id], clean_dataloader_kwargs),
             )
             for group_id in range(len(WATERBIRDS_ONLY_FG_PATHS))
+            # if group_id == 3 or group_id == 2
         ]
+        # print(f"Uncomment above to run for group if group_id != 3 and group_id != 2")
 
         dataset_name_path_list = (
             standard_wb_group_paths + only_fg_wb_group_paths
