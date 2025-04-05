@@ -56,6 +56,7 @@ IMAGE_NORMALIZATION_CONST = 255
 DATA_PATH = os.path.join(get_project_root_path(), "data")
 JSON_PATH = os.path.join(get_project_root_path(), "jsons")
 DATASETS_PATH = os.path.join(DATA_PATH, "datasets")
+CSV_PATH = os.path.join(DATA_PATH, "csvs")
 
 
 def open_pil_image(image_path):

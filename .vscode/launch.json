@@ -59,20 +59,27 @@
                 "--result_path",
                 "./data/results/eval_spurious/eval_debug.pkl",
                 // "--recompute_all",
-                // "--ens_entropy",
+                "--ens_entropy",
                 "--clip",
                 // "--siglip",
                 "--dataset_name",
                 // "imagenet_d",
                 // "waterbirds",
-                "urban_cars",
+                // "urban_cars",
                 // "imagenet_9",
                 // "counter_animal",
+                "in_val",
                 "--mask_source",
                 // "dino_ft",
                 "cropformer",
                 "--filter_keyword",
-                "by_mask_size"
+                // "by_mask_size"
+                // "by_mask_size+by_border_touch+by_border_vs_area+by_top_area@5"
+                // "by_mask_size+by_border_touch+by_border_vs_area+by_top_area@10"
+                // "by_mask_size+by_border_touch+by_border_vs_area+by_aspect_ratio"
+                "by_mask_size+by_border_touch+by_border_vs_area+by_aspect_ratio+by_num_connected_components"
+                // "by_mask_size+by_border_touch+by_border_vs_area+by_num_connected_components"
+                // "by_mask_size+by_border_vs_area+by_num_connected_components"
             ]
         },
         {
@@ -94,17 +101,28 @@
                 "--config_path",
                 "./configs/show_dataset/data_config.yaml",
                 "--path_within_config",
-                "data/dataset_configs/bboxed_dataset_urban_cars",
+                // "data/dataset_configs/bboxed_dataset_urban_cars",
+                "data/dataset_configs/bboxed_dataset_wb_group_3",
+                // "data/dataset_configs/bboxed_dataset_wb_group_2",
                 "--split",
                 "eval",
                 // "--hardcoded",
-                "--images_list",
-                "/0/074.jpg",
+                // "--images_list",
+                // "Gull_0131",
+                // "0066_796333",
+                // "Pomarine_Jaeger_0056",
+                // "/0/074.jpg",
                 "--n_images",
                 "20",
                 "--data_kwargs",
-                "dataset_task=detection;foreground_keyword=ens_entropy;filter_keyword=by_mask_size",
+                // "dataset_task=detection;foreground_keyword=ens_entropy;filter_keyword=by_mask_size",
+                // "dataset_task=classification;foreground_keyword=oracle---clip_openai_ViT-L/14;filter_keyword=by_mask_size",
+                //
+                "dataset_task=classification;foreground_keyword=oracle---clip_openai_ViT-L/14"
+                // "dataset_task=detection;foreground_keyword=oracle---clip_openai_ViT-L/14;filter_keyword=by_mask_size+by_border_touch+by_border_vs_area+by_num_connected_components"
+                // "dataset_task=classification;foreground_keyword=oracle---clip_openai_ViT-L/14;filter_keyword=by_mask_size+by_border_vs_area+by_num_connected_components"
             ]
+
         },
     ]
 }

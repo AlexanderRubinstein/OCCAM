@@ -4,49 +4,61 @@ import torch
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import argparse
-from sklearn.metrics import PrecisionRecallDisplay, roc_auc_score, roc_curve
+from sklearn.metrics import (
+    PrecisionRecallDisplay,
+    # roc_auc_score,
+    roc_curve,
+)
 
 # import scikitplot as skplt
 import matplotlib.pyplot as plt
 
 # import einops
-from stuned.utility.utils import get_project_root_path, load_from_pickle
+# from stuned.utility.utils import get_project_root_path, load_from_pickle
 
 
 sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src")
 )
-import densifier  # for setting the variable with project root
+# import densifier  # for setting the variable with project root
 
-sys.path.insert(0, os.path.join(get_project_root_path(), "notebooks"))
-from debiasing import make_models, get_uncertainty_score, optionally_make_dir
+# sys.path.insert(0, os.path.join(get_project_root_path(), "notebooks"))
+# from debiasing import make_models, get_uncertainty_score, optionally_make_dir
 
-sys.path.pop(0)
-import densifier
-from densifier.datasets.bboxed_dataset import make_bboxed_dataset_from_config
-from densifier.eval_clip.eval import (
-    add_openai_clip_model,
-    add_alpha_clip_model,
-    add_openclip_model,
-)
-from densifier.datasets.imagenet_classes import get_in_classes_prompts
-from densifier.eval_clip.eval import (
-    apply_visual_prompts,
-    _build_timm_model,
-    is_background,
-)
-from densifier.utility.utils_for_notebooks import (
-    # visualize_images_side_by_side,
-    # show_image_and_mask,
-    # load_data,
-    # evaluate_model,
-    make_symlink_cmd,
-    tensor_for_matplotlib,
-    # unnormalize,
-    show_in_rows,
-    batch_elements,
-)
-from densifier.detection.uncertainty_scores import (
+# sys.path.pop(0)
+# import densifier
+# from densifier.datasets.bboxed_dataset import make_bboxed_dataset_from_config
+# from densifier.eval_clip.eval import (
+#     add_openai_clip_model,
+#     add_alpha_clip_model,
+#     add_openclip_model,
+# )
+# from densifier.datasets.imagenet_classes import get_in_classes_prompts
+# from densifier.eval_clip.eval import (
+#     apply_visual_prompts,
+#     _build_timm_model,
+#     is_background,
+# )
+# from densifier.utility.utils_for_notebooks import (
+#     # visualize_images_side_by_side,
+#     # show_image_and_mask,
+#     # load_data,
+#     # evaluate_model,
+#     make_symlink_cmd,
+#     tensor_for_matplotlib,
+#     # unnormalize,
+#     show_in_rows,
+#     batch_elements,
+# )
+# from densifier.detection.uncertainty_scores import (
+#     div_continous_unique_per_sample,
+#     average_energy_per_sample,
+#     ens_entropy_per_sample,
+#     entropy,
+#     ens_conf_per_sample,
+#     get_probs,
+# )
+from occam.ood_detection.uncertainty_scores import (
     div_continous_unique_per_sample,
     average_energy_per_sample,
     ens_entropy_per_sample,
@@ -54,6 +66,9 @@ from densifier.detection.uncertainty_scores import (
     ens_conf_per_sample,
     get_probs,
 )
+from occam.datasets.bboxed_dataset import make_bboxed_dataset_from_config
+from occam.datasets.imagenet_classes import get_in_classes_prompts
+from occam.robust_classification.models import clip_models_with_same_preprocess
 
 sys.path.pop(0)
 
@@ -63,7 +78,12 @@ sys.path.pop(0)
 #     make_transforms
 # )
 
-from stuned.utility.utils import show_images, load_from_pickle, append_dict
+from stuned.utility.utils import (
+    show_images,
+    load_from_pickle,
+    append_dict,
+    optionally_make_dir,
+)
 from stuned.local_datasets.imagenet1k import get_imagenet_dataset
 from stuned.local_datasets.transforms import (
     DEFAULT_RESIZE_IN,
@@ -258,6 +278,11 @@ def get_parser():
     #     help="use clip"
     # )
     parser.add_argument("--clips", action="store_true", help="use clip models")
+    parser.add_argument(
+        "--filter_keyword",
+        default=None,
+        help="filter keyword for filtering masks",
+    )
     # parser.add_argument(
     #     "--batch_size",
     #     type=int,
@@ -316,66 +341,66 @@ def main():
     # ('ViT-L-14-CLIPA', 'datacomp1b')
     # ('ViT-L-14-CLIPA-336', 'datacomp1b')
     if args.clips:
-        raise NotImplementedError(
-            "use make_clip_ensemble instead of the code below"
-        )
-        models_dict = {}
+        # raise NotImplementedError(
+        #     "use make_clip_ensemble instead of the code below"
+        # )
+        # models_dict = {}
         category_list = get_in_classes_prompts()
-        # add_openai_clip_model('ViT-L/14', category_list, models_dict)
+        # # add_openai_clip_model('ViT-L/14', category_list, models_dict)
+        # # add_openclip_model(
+        # #     model_id='ViT-L-16-SigLIP-256',
+        # #     category_list=category_list,
+        # #     models_dict=models_dict,
+        # #     pretrained='webli'
+        # # )
+        # # add_openclip_model(
+        # #     model_id='ViT-L-14',
+        # #     category_list=category_list,
+        # #     models_dict=models_dict,
+        # #     pretrained='laion400m_e32'
+        # # )
         # add_openclip_model(
-        #     model_id='ViT-L-16-SigLIP-256',
+        #     model_id="ViT-L-14",
         #     category_list=category_list,
         #     models_dict=models_dict,
-        #     pretrained='webli'
+        #     pretrained="datacomp_xl_s13b_b90k",
+        # )
+        # # add_openclip_model(
+        # #     model_id='ViT-L-14',
+        # #     category_list=category_list,
+        # #     models_dict=models_dict,
+        # #     pretrained='laion2b_s32b_b82k'
+        # # ) # has normalize 0.5, 0.5, 0.5
+        # add_openclip_model(
+        #     model_id="ViT-L-14-quickgelu",
+        #     category_list=category_list,
+        #     models_dict=models_dict,
+        #     pretrained="dfn2b",
         # )
         # add_openclip_model(
-        #     model_id='ViT-L-14',
+        #     model_id="ViT-L-14",
         #     category_list=category_list,
         #     models_dict=models_dict,
-        #     pretrained='laion400m_e32'
+        #     pretrained="openai",
         # )
-        add_openclip_model(
-            model_id="ViT-L-14",
-            category_list=category_list,
-            models_dict=models_dict,
-            pretrained="datacomp_xl_s13b_b90k",
-        )
         # add_openclip_model(
-        #     model_id='ViT-L-14',
+        #     model_id="ViT-L-14",
         #     category_list=category_list,
         #     models_dict=models_dict,
-        #     pretrained='laion2b_s32b_b82k'
-        # ) # has normalize 0.5, 0.5, 0.5
-        add_openclip_model(
-            model_id="ViT-L-14-quickgelu",
-            category_list=category_list,
-            models_dict=models_dict,
-            pretrained="dfn2b",
-        )
-        add_openclip_model(
-            model_id="ViT-L-14",
-            category_list=category_list,
-            models_dict=models_dict,
-            pretrained="openai",
-        )
-        add_openclip_model(
-            model_id="ViT-L-14",
-            category_list=category_list,
-            models_dict=models_dict,
-            pretrained="laion400m_e31",
-        )
-        # add_openclip_model(
-        #     model_id='ViT-L-14',
-        #     category_list=category_list,
-        #     models_dict=models_dict,
-        #     pretrained='laion400m_e31'
+        #     pretrained="laion400m_e31",
         # )
-        add_openclip_model(
-            model_id="ViT-L-14",
-            category_list=category_list,
-            models_dict=models_dict,
-            pretrained="laion400m_e32",
-        )
+        # # add_openclip_model(
+        # #     model_id='ViT-L-14',
+        # #     category_list=category_list,
+        # #     models_dict=models_dict,
+        # #     pretrained='laion400m_e31'
+        # # )
+        # add_openclip_model(
+        #     model_id="ViT-L-14",
+        #     category_list=category_list,
+        #     models_dict=models_dict,
+        #     pretrained="laion400m_e32",
+        # )
 
         # final model name: clip_openclip_<pretrained>_ + <model_id>
         # clip_openclip_datacomp_xl_s13b_b90k_ViT-L-14
@@ -384,40 +409,52 @@ def main():
         # clip_openclip_laion400m_e31_ViT-L-14
         # clip_openclip_laion400m_e32_ViT-L-14
 
-        model_list = []
-        for model_id, (model, preprocess) in models_dict.items():
-            if transform is None:
-                transform = preprocess
-            else:
-                # or at least normalization and cropping the same?
-                assert str(transform) == str(
-                    preprocess
-                ), "transforms must be the same"
-            model_list.append((model_id, model))
-    else:
-        model_list = make_models(
-            [
-                "resnet50.a1_in1k",
-                "resnet18.a1_in1k",
-                "vit_base_patch8_224.augreg2_in21k_ft_in1k",
-                "tf_efficientnet_b1.ns_jft_in1k",
-                "efficientnet_lite0.ra_in1k",
-            ]
+        # model_list = []
+        # for model_id, (model, preprocess) in models_dict.items():
+        #     if transform is None:
+        #         transform = preprocess
+        #     else:
+        #         # or at least normalization and cropping the same?
+        #         assert str(transform) == str(
+        #             preprocess
+        #         ), "transforms must be the same"
+        #     model_list.append((model_id, model))
+
+        model_list, transform, names_list = clip_models_with_same_preprocess(
+            category_list, return_names=True
         )
+        model_list = list(zip(names_list, model_list))
+    else:
+        # model_list = make_models(
+        #     [
+        #         "resnet50.a1_in1k",
+        #         "resnet18.a1_in1k",
+        #         "vit_base_patch8_224.augreg2_in21k_ft_in1k",
+        #         "tf_efficientnet_b1.ns_jft_in1k",
+        #         "efficientnet_lite0.ra_in1k",
+        #     ]
+        # )
+        raise NotImplementedError()
 
     if transform is None:
         transform = make_default_test_transforms_imagenet()
 
     bboxed_dataset_config = {
-        "csv_path": "/mnt/lustre/work/oh/arubinstein17/github/densification/data/csvs/cropformer/source_in_val_with_bboxes_cropformer.parquet",
+        "csv_path": os.path.join(
+            DATA_PATH,
+            "csvs",
+            "cropformer",
+            "source_in_val_cropformer.parquet",
+        ),
         #   "csv_path": "/home/oh/arubinstein17/github/densification/data/csvs/cropformer/source_urban_cars_cropformer.parquet", # to speed up debug
         # csv_path: /home/oh/arubinstein17/github/densification/data/csvs/counter_debug.parquet
         "dataset_task": "detection",
         "eval_transform": transform,
         "train_transform": None,
         "train_val_split": 0.0,
-        "foreground_keyword": "bbox_iou"  # is_main_object is decided based on bbox_iou
+        "foreground_keyword": "bbox_iou",  # is_main_object is decided based on bbox_iou
         # "foreground_keyword": "oracle---alpha_clip_ViT-L/14" # for faster debug
+        "filter_keyword": args.filter_keyword,
     }
 
     bboxed_dataset = make_bboxed_dataset_from_config(

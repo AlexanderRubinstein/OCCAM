@@ -177,7 +177,7 @@ class ClipWrapper(torch.nn.Module):
         )
 
 
-def clip_models_with_same_preprocess(category_list):
+def clip_models_with_same_preprocess(category_list, return_names=False):
     models_dict = {}
     # category_list = get_in_classes_prompts()
     # add_openai_clip_model('ViT-L/14', category_list, models_dict)
@@ -244,6 +244,7 @@ def clip_models_with_same_preprocess(category_list):
     # clip_openclip_laion400m_e32_ViT-L-14
 
     models_list = []
+    names_list = []
     transform = None
     for model_id, builder in models_dict.items():
         assert isinstance(builder, ModelBuilder)
@@ -262,8 +263,12 @@ def clip_models_with_same_preprocess(category_list):
                 preprocess
             ), "transforms must be the same"
         models_list.append(model)
-    assert transform is not None
-    return models_list, transform
+        names_list.append(model_id)
+
+    res = [models_list, transform]
+    if return_names:
+        res.append(names_list)
+    return res
 
 
 class ClipEnsemble(torch.nn.Module):

@@ -159,7 +159,7 @@ def make_df_with_foreground_scores(
             make_mapping_dict_func = make_mapping_dict_waterbirds
         elif dataset_name == "urban_cars":
             make_mapping_dict_func = make_mapping_dict_generic_from_folder
-        elif dataset_name == "in_val_with_bboxes":
+        elif dataset_name == "in_val":
             make_mapping_dict_func = make_mapping_dict_generic_from_folder
         else:
             assert (
