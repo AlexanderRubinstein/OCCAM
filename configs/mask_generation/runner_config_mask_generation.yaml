@@ -13,3 +13,4 @@ kwargs:
 logging:
   gdrive_storage_folder: null
   use_wandb: false
+  gdrive_storage_folder: https://drive.google.com/drive/folders/1bCKbgY29CXsgYSwBHk49weolkA5cBePT?usp=share_link

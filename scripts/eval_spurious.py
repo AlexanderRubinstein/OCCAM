@@ -248,12 +248,12 @@ def add_clip_models(models_dict, category_list, dataset_name, siglip=False):
         add_openai_clip_model("RN50", category_list, models_dict)
         # print("Uncomment 2 above pls")
     if siglip:
-        add_openclip_model(
-            model_id="ViT-SO400M-14-SigLIP-384",
-            category_list=category_list,
-            models_dict=models_dict,
-            pretrained="webli",
-        )
+        # add_openclip_model(
+        #     model_id="ViT-SO400M-14-SigLIP-384",
+        #     category_list=category_list,
+        #     models_dict=models_dict,
+        #     pretrained="webli",
+        # )
         # add_openclip_model(
         #     model_id='nllb-clip-base-siglip',
         #     category_list=category_list,
@@ -284,6 +284,7 @@ def add_clip_models(models_dict, category_list, dataset_name, siglip=False):
         #     models_dict=models_dict,
         #     pretrained='laion2b_s39b_b160k'
         # )
+
         add_openclip_model(
             model_id="ViT-B-16-SigLIP",
             category_list=category_list,
@@ -308,12 +309,6 @@ def add_clip_models(models_dict, category_list, dataset_name, siglip=False):
             models_dict=models_dict,
             pretrained="webli",
         )
-        # add_openclip_model(
-        #     model_id='ViT-B-16-SigLIP-512',
-        #     category_list=category_list,
-        #     models_dict=models_dict,
-        #     pretrained='webli'
-        # )
         add_openclip_model(
             model_id="ViT-L-16-SigLIP-256",
             category_list=category_list,
@@ -332,6 +327,7 @@ def add_clip_models(models_dict, category_list, dataset_name, siglip=False):
             models_dict=models_dict,
             pretrained="webli",
         )
+        print("Uncomment 3 above pls")
         add_openclip_model(
             model_id="ViT-SO400M-14-SigLIP-384",
             category_list=category_list,

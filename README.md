@@ -1,5 +1,7 @@
 # Are We Done with Object-Centric Learning?
 
+- Remove this: gdrive_storage_folder: https://drive.google.com/drive/folders/1bCKbgY29CXsgYSwBHk49weolkA5cBePT?usp=share_link
+
 ## Overview
 
 ![Are We Done with Object-Centric Learning?](./figures/teaser.png "Are We Done with Object-Centric Learning?")
