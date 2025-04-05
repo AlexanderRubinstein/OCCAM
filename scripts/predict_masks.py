@@ -24,6 +24,7 @@ from stuned.utility.utils import (
     optionally_make_dir,
     get_project_root_path,
     create_tar_from_folder,
+    remove_file_or_folder,
 )
 
 
@@ -102,9 +103,13 @@ if __name__ == "__main__":
             args.range = None
 
         # CropFormer requires a tar dataset
-        tar_path = os.path.join(
-            TAR_FOLDER, os.path.basename(args.input_folder) + ".tar.gz"
+        tar_name = (
+            os.path.basename(os.path.dirname(args.input_folder))
+            + "_"
+            + os.path.basename(args.input_folder)
+            + ".tar.gz"
         )
+        tar_path = os.path.join(TAR_FOLDER, tar_name)
 
         if not os.path.exists(tar_path):
             print(f"Tar file {tar_path} does not exist, creating it...")
@@ -124,6 +129,7 @@ if __name__ == "__main__":
 
         # Save Segments
         pickle.dump(output, open(args.output, "wb"))
+        remove_file_or_folder(tar_path)
 
     elif args.mask_generator_type == "dino-ft":
         should_be_provided(args.model_id, "model_id", "dino-ft")
