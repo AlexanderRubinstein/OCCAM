@@ -245,6 +245,7 @@ def main():
     table_2d = make_table_2(results_df, "d")
     table_3 = make_table_3(results_df)
     table_4 = make_table_4(results_df)
+    table_5 = make_table_5(results_df)
 
     # ordered_rows = [
     #     [("arch", "CLIP"), ("mask_source", "-"), ("mask_method", "-"), ("fg_score", "-"), ("model", "clip_openai_ViT-L/14")],
@@ -280,6 +281,7 @@ def main():
     )
     table_3.to_csv(os.path.join(args.result_folder, "Table_3.csv"), index=False)
     table_4.to_csv(os.path.join(args.result_folder, "Table_4.csv"), index=False)
+    table_5.to_csv(os.path.join(args.result_folder, "Table_5.csv"), index=False)
     # print(results_df)
     # results_df.to_csv(
     #     os.path.join(args.result_folder, "Table_4.csv"), index=False
@@ -391,21 +393,21 @@ def make_table_4(results_df):
     ordered_rows = [
         ["CLIP", "-", "-", "-", CLIP],
         #
-        ["CLIP", "Gray BG + Crop", "dino_ft", "max_prob", CLIP],
+        # ["CLIP", "Gray BG + Crop", "dino_ft", "max_prob", CLIP],
         ["CLIP", "Gray BG + Crop", "dino_ft", "ens_entropy", CLIP],
         ["CLIP", "Gray BG + Crop", "dino_ft", "oracle", CLIP],
         #
-        ["CLIP", "Gray BG + Crop", "cropformer", "max_prob", CLIP],
+        # ["CLIP", "Gray BG + Crop", "cropformer", "max_prob", CLIP],
         ["CLIP", "Gray BG + Crop", "cropformer", "ens_entropy", CLIP],
         ["CLIP", "Gray BG + Crop", "cropformer", "oracle", CLIP],
         #
         ["AlphaCLIP", ALPHA_ONE, "-", "-", ALPHA_CLIP],
         #
-        ["AlphaCLIP", ALPHA_CHANNEL, "dino_ft", "max_prob", ALPHA_CLIP],
+        # ["AlphaCLIP", ALPHA_CHANNEL, "dino_ft", "max_prob", ALPHA_CLIP],
         ["AlphaCLIP", ALPHA_CHANNEL, "dino_ft", "ens_entropy", ALPHA_CLIP],
         ["AlphaCLIP", ALPHA_CHANNEL, "dino_ft", "oracle", ALPHA_CLIP],
         #
-        ["AlphaCLIP", ALPHA_CHANNEL, "cropformer", "max_prob", ALPHA_CLIP],
+        # ["AlphaCLIP", ALPHA_CHANNEL, "cropformer", "max_prob", ALPHA_CLIP],
         ["AlphaCLIP", ALPHA_CHANNEL, "cropformer", "ens_entropy", ALPHA_CLIP],
         ["AlphaCLIP", ALPHA_CHANNEL, "cropformer", "oracle", ALPHA_CLIP],
         # [("arch", "CLIP"), ("mask_source", "-"), ("mask_method", "-"), ("fg_score", "-"), ("model", "clip_openai_ViT-L/14")],
@@ -436,6 +438,45 @@ def make_table_4(results_df):
         "urban_cars",
         "delta",
     ]
+    table = table[cols_order]
+
+    table = table.map(format_number)
+
+    # for i, row in table_4.iterrows():
+    #     row["model"] = row["model"].split("@")[0]
+
+    return table
+
+
+def make_table_5(results_df):
+    col_names = ["arch", "mask_method", "mask_source", "fg_score", "model"]
+    cols_order = [
+        "arch",
+        "mask_source",
+        "mask_method",
+        "fg_score",
+        "waterbirds",
+    ]
+
+    ordered_rows = [
+        ["CLIP", "-", "-", "-", CLIP],
+        # ["CLIP", "Gray BG + Crop", "dino_ft", "oracle", CLIP],
+        ["CLIP", "Gray BG + Crop", "cropformer", "ens_entropy", CLIP],
+        ["CLIP", "Gray BG + Crop", "cropformer", "oracle", CLIP],
+        ["CLIP", "Gray BG + Crop", "dino_ft", "only_fg", CLIP],
+    ]
+
+    # table = None
+    # for ordered_row in ordered_rows:
+    #     row = results_df
+    #     for key, value in zip(col_names, ordered_row):
+    #         row = row[row[key] == value]
+    #     if table is None:
+    #         table = row
+    #     else:
+    #         table = pd.concat([table, row], ignore_index=True)
+    table = filter_table_by_ordered_rows(results_df, ordered_rows, col_names)
+
     table = table[cols_order]
 
     table = table.map(format_number)
