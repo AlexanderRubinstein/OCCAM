@@ -401,7 +401,7 @@ def main():
         _df_path = os.path.join(
             parquets_base_dir,
             args.mask_source,
-            f"source_urban_cars_{args.mask_source}_{args.filter_keyword}.parquet",
+            f"source_urban_cars_{args.filter_keyword}.parquet",
         )
 
         _images_path = URBAN_CARS_PATH

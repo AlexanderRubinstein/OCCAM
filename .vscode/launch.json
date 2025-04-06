@@ -64,22 +64,22 @@
                 // "--siglip",
                 "--dataset_name",
                 // "imagenet_d",
-                "waterbirds",
+                // "waterbirds",
                 // "in_val",
                 // "urban_cars",
                 // "imagenet_9",
-                // "counter_animal",
+                "counter_animal",
                 // "in_val",
                 "--mask_source",
                 // "dino_ft",
                 "cropformer",
-                "--filter_keyword",
+                // "--filter_keyword",
                 // "by_mask_size"
                 // "by_mask_size+by_border_touch+by_border_vs_area+by_top_area@5"
                 // "by_mask_size+by_border_touch+by_border_vs_area+by_top_area@10"
                 // "by_mask_size+by_border_touch+by_border_vs_area+by_aspect_ratio"
                 // "by_mask_size+by_border_touch+by_border_vs_area+by_aspect_ratio+by_num_connected_components"
-                "by_mask_size+by_background+by_num_connected_components",
+                // "by_mask_size+by_background+by_num_connected_components",
                 // "by_mask_size+by_background+by_num_connected_components"
                 // "by_mask_size+by_border_touch+by_border_vs_area+by_num_connected_components"
                 // "by_mask_size+by_border_vs_area+by_num_connected_components"
@@ -131,8 +131,9 @@
                 "--config_path",
                 "./configs/show_dataset/data_config.yaml",
                 "--path_within_config",
-                // "data/dataset_configs/bboxed_dataset_urban_cars",
-                "data/dataset_configs/bboxed_dataset_wb_group_3",
+                "data/dataset_configs/bboxed_dataset_urban_cars",
+                // "data/dataset_configs/bboxed_dataset_wb_group_3",
+                // "data/dataset_configs/bboxed_dataset_counter",
                 // "data/dataset_configs/bboxed_dataset_in_d",
                 // "data/dataset_configs/bboxed_dataset_wb_group_2",
                 // "data/dataset_configs/bboxed_dataset_in_9",

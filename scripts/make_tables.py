@@ -27,6 +27,8 @@ ALPHA_CHANNEL = "$\\alpha$-channel"
 ALPHA_ONE = "($\\alpha$ = 1)"
 ALPHA_CLIP = "alpha_clip_ViT-L/14"
 CLIP = "clip_openai_ViT-L/14"
+SIGLIP = "clip_openclip_webli_ViT-B-16-SigLIP-384"
+CLIP_RN50 = "clip_openai_RN50"
 
 
 def get_parser():
@@ -47,11 +49,15 @@ def get_parser():
     return parser
 
 
+def format_percentage(x):
+    return f"{(100 * float(x)):.1f}"
+
+
 def format_number(x):
     if x == "-" or not is_number(x):
         return x
     else:
-        return f"{(100 * float(x)):.1f}"
+        return format_percentage(x)
 
 
 def parse_results_line(line, dataset_name):
@@ -233,6 +239,11 @@ def main():
         {**{col: single_non_nan for col in dataset_cols}}
     )
 
+    table_2a = make_table_2(results_df, "a")
+    table_2b = make_table_2(results_df, "b")
+    table_2c = make_table_2(results_df, "c")
+    table_2d = make_table_2(results_df, "d")
+    table_3 = make_table_3(results_df)
     table_4 = make_table_4(results_df)
 
     # ordered_rows = [
@@ -255,11 +266,124 @@ def main():
 
     optionally_make_dir(args.result_folder, call_dirname=False)
 
+    table_2a.to_csv(
+        os.path.join(args.result_folder, "Table_2a.csv"), index=False
+    )
+    table_2b.to_csv(
+        os.path.join(args.result_folder, "Table_2b.csv"), index=False
+    )
+    table_2c.to_csv(
+        os.path.join(args.result_folder, "Table_2c.csv"), index=False
+    )
+    table_2d.to_csv(
+        os.path.join(args.result_folder, "Table_2d.csv"), index=False
+    )
+    table_3.to_csv(os.path.join(args.result_folder, "Table_3.csv"), index=False)
     table_4.to_csv(os.path.join(args.result_folder, "Table_4.csv"), index=False)
     # print(results_df)
     # results_df.to_csv(
     #     os.path.join(args.result_folder, "Table_4.csv"), index=False
     # )
+
+
+def filter_table_by_ordered_rows(results_df, ordered_rows, col_names):
+    table = None
+    for ordered_row in ordered_rows:
+        row = results_df
+        for key, value in zip(col_names, ordered_row):
+            row = row[row[key] == value]
+        if table is None:
+            table = row
+        else:
+            table = pd.concat([table, row], ignore_index=True)
+    return table
+
+
+def make_table_2(results_df, section):
+    col_names = ["arch", "mask_method", "mask_source", "fg_score", "model"]
+    cols_order = [
+        "arch",
+        "mask_source",
+        "mask_method",
+        "fg_score",
+    ]
+    if section == "a":
+        cols_order += ["imagenet_d"]
+        ordered_rows = [
+            ["AlphaCLIP", ALPHA_ONE, "-", "-", ALPHA_CLIP],
+            ["CLIP", "Gray BG + Crop", "dino_ft", "oracle", CLIP],
+            ["CLIP", "Gray BG + Crop", "cropformer", "oracle", CLIP],
+            #
+            ["CLIP", "-", "-", "-", SIGLIP],
+            ["CLIP", "Gray BG + Crop", "dino_ft", "oracle", SIGLIP],
+            ["CLIP", "Gray BG + Crop", "cropformer", "oracle", SIGLIP],
+        ]
+    elif section in ["b", "c", "d"]:
+        if section == "b":
+            cols_order += ["urban_cars"]
+        elif section == "c":
+            cols_order += ["imagenet_9"]
+        elif section == "d":
+            cols_order += ["waterbirds"]
+        ordered_rows = [
+            ["CLIP", "-", "-", "-", CLIP],
+            ["CLIP", "Gray BG + Crop", "dino_ft", "oracle", CLIP],
+            ["CLIP", "Gray BG + Crop", "cropformer", "oracle", CLIP],
+            #
+            ["CLIP", "-", "-", "-", CLIP_RN50],
+            ["CLIP", "Gray BG + Crop", "dino_ft", "oracle", CLIP_RN50],
+            ["CLIP", "Gray BG + Crop", "cropformer", "oracle", CLIP_RN50],
+        ]
+    else:
+        raise NotImplementedError(f"Section {section} not implemented")
+
+    # table = None
+    # for ordered_row in ordered_rows:
+    #     row = results_df
+    #     for key, value in zip(col_names, ordered_row):
+    #         row = row[row[key] == value]
+    #     if table is None:
+    #         table = row
+    #     else:
+    #         table = pd.concat([table, row], ignore_index=True)
+    table = filter_table_by_ordered_rows(results_df, ordered_rows, col_names)
+
+    table = table[cols_order]
+
+    table = table.map(format_number)
+
+    # for i, row in table_4.iterrows():
+    #     row["model"] = row["model"].split("@")[0]
+
+    return table
+
+
+def make_table_3(results_df):
+    col_names = ["arch", "mask_method", "mask_source", "fg_score", "model"]
+    cols_order = [
+        "arch",
+        "mask_source",
+        "mask_method",
+        "fg_score",
+        "Cmn/Ctr",
+        "Cmn - Ctr",
+    ]
+    ordered_rows = [
+        ["AlphaCLIP", ALPHA_ONE, "-", "-", ALPHA_CLIP],
+        ["AlphaCLIP", ALPHA_CHANNEL, "dino_ft", "oracle", ALPHA_CLIP],
+        ["AlphaCLIP", ALPHA_CHANNEL, "cropformer", "oracle", ALPHA_CLIP],
+    ]
+    table = filter_table_by_ordered_rows(results_df, ordered_rows, col_names)
+    add_delta_column(table, name="Cmn - Ctr")
+    table["Cmn/Ctr"] = table.apply(
+        lambda row: f"{format_percentage(row['common'])}/{format_percentage(row['counter'])}"
+        if row["common"] != "-" and row["counter"] != "-"
+        else "-",
+        axis=1,
+    )
+    table = table[cols_order]
+    table = table.map(format_number)
+    return table
 
 
 def make_table_4(results_df):
@@ -287,23 +411,19 @@ def make_table_4(results_df):
         # [("arch", "CLIP"), ("mask_source", "-"), ("mask_method", "-"), ("fg_score", "-"), ("model", "clip_openai_ViT-L/14")],
     ]
 
-    table_4 = None
-    for row in ordered_rows:
-        row_4 = results_df
-        for key, value in zip(col_names, row):
-            row_4 = row_4[row_4[key] == value]
-        if table_4 is None:
-            table_4 = row_4
-        else:
-            table_4 = pd.concat([table_4, row_4], ignore_index=True)
+    # table_4 = None
+    # for row in ordered_rows:
+    #     row_4 = results_df
+    #     for key, value in zip(col_names, row):
+    #         row_4 = row_4[row_4[key] == value]
+    #     if table_4 is None:
+    #         table_4 = row_4
+    #     else:
+    #         table_4 = pd.concat([table_4, row_4], ignore_index=True)
+    table = filter_table_by_ordered_rows(results_df, ordered_rows, col_names)
 
     # Add delta column with difference between common and counter
-    table_4["delta"] = table_4.apply(
-        lambda row: float(row["common"]) - float(row["counter"])
-        if row["common"] != "-" and row["counter"] != "-"
-        else "-",
-        axis=1,
-    )
+    add_delta_column(table)
 
     cols_order = [
         "arch",
@@ -316,14 +436,23 @@ def make_table_4(results_df):
         "urban_cars",
         "delta",
     ]
-    table_4 = table_4[cols_order]
+    table = table[cols_order]
 
-    table_4 = table_4.applymap(format_number)
+    table = table.map(format_number)
 
     # for i, row in table_4.iterrows():
     #     row["model"] = row["model"].split("@")[0]
 
-    return table_4
+    return table
+
+
+def add_delta_column(table, name="delta"):
+    table[name] = table.apply(
+        lambda row: float(row["common"]) - float(row["counter"])
+        if row["common"] != "-" and row["counter"] != "-"
+        else "-",
+        axis=1,
+    )
 
 
 def single_non_nan(x):
