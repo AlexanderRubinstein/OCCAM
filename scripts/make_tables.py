@@ -47,13 +47,24 @@ def get_parser():
     return parser
 
 
+def format_number(x):
+    if x == "-" or not is_number(x):
+        return x
+    else:
+        return f"{(100 * float(x)):.1f}"
+
+
 def parse_results_line(line, dataset_name):
+    # if "clean_" in line:
+    #     print("DEBUG:")
     line = line.replace("mix_rand_", "")  # remove for ImageNet-9
-    line = line.replace("clean_", "")  # remove for CounterAnimal clean
     line = line.replace("bg_", "")
 
     if dataset_name == "counter_animal":
-        dataset_name = line.split("_")[0]
+        if "---None---" in line:
+            dataset_name = line.split("---")[0]
+        else:
+            dataset_name = line.split("_")[0]
 
     line = line.replace(
         dataset_name + "_", ""
@@ -127,6 +138,9 @@ def main():
             stdout = f.read()
         last_lines = stdout.split("\n")
         for line in last_lines:
+            line = line.replace("clean_", "")  # remove for CounterAnimal clean
+            # if "clean_" in line and "0.658368" in line:
+            #     print("DEBUG:")
             line = line.split("(log): ")[
                 -1
             ]  # in case log is on the same line as the results
@@ -303,6 +317,8 @@ def make_table_4(results_df):
         "delta",
     ]
     table_4 = table_4[cols_order]
+
+    table_4 = table_4.applymap(format_number)
 
     # for i, row in table_4.iterrows():
     #     row["model"] = row["model"].split("@")[0]
