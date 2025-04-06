@@ -44,6 +44,11 @@ def get_parser():
 
 def parse_results_line(line, dataset_name):
     line = line.replace("mix_rand_", "")  # remove for ImageNet-9
+    line = line.replace("clean_", "")  # remove for CounterAnimal clean
+
+    if dataset_name == "counter_animal":
+        dataset_name = line.split("_")[0]
+
     line = line.replace(
         dataset_name + "_", ""
     )  # we already know the dataset name
@@ -53,8 +58,14 @@ def parse_results_line(line, dataset_name):
         ]  # in case of Waterbirds we have two underscores at the beginning
 
     line_parts = line.split()
+
+    if dataset_name in ["common", "counter"]:
+        assert len(line_parts) == 3
+    else:
+        assert len(line_parts) == 2
+
     full_name = line_parts[0]
-    score = float(line_parts[-1])
+    score = float(line_parts[1])
 
     # Parse the full name
     if "None" in full_name:
@@ -71,7 +82,13 @@ def parse_results_line(line, dataset_name):
             0
         ]  # oracle---clip_openai_RN50 -> oracle
         model = model_raw.split("@model")[0]
-    return fg_score, model, score
+    return dataset_name, fg_score, model, score
+
+
+def is_result_line(line, dataset_name):
+    if dataset_name == "counter_animal":
+        return line.startswith("counter") or line.startswith("common")
+    return line.startswith(dataset_name)
 
 
 def main():
@@ -100,10 +117,10 @@ def main():
             line = line.split("(log): ")[
                 -1
             ]  # in case log is on the same line as the results
-            if line.startswith(dataset_name):
-                # dataset, fg_score, model, score = parse_results_line(line, dataset_name)
-
-                fg_score, model, score = parse_results_line(line, dataset_name)
+            if is_result_line(line, dataset_name):
+                cur_dataset_name, fg_score, model, score = parse_results_line(
+                    line, dataset_name
+                )
 
                 if fg_score == "None":
                     fg_score = "-"
@@ -150,7 +167,7 @@ def main():
                 result_row = {
                     "arch": arch,
                     "mask_method": mask_method,
-                    "dataset": dataset_name,
+                    "dataset": cur_dataset_name,
                     "fg_score": fg_score,
                     "model": model,
                     "score": score,
@@ -169,10 +186,6 @@ def main():
             )
             continue
 
-        # print(stdout)
-        # print(stdout)
-        # print(row["source_image_path"])
-
     for result_row in result_rows:
         cur_row = copy.deepcopy(result_row)
         cur_row[cur_row.pop("dataset")] = cur_row.pop("score")
@@ -181,12 +194,14 @@ def main():
         if results_df is None:
             results_df = cur_df
         else:
-            results_df = pd.merge(results_df, cur_df, how="outer")
+            results_df = pd.concat([results_df, cur_df], ignore_index=True)
 
+    # flatten diagonal to horizontal
     groupby_cols = ["arch", "mask_source", "mask_method", "fg_score", "model"]
     dataset_cols = {
         col for col in results_df.columns if col not in groupby_cols
     }
+
     results_df = results_df.groupby(groupby_cols, as_index=False).agg(
         {**{col: single_non_nan for col in dataset_cols}}
     )
@@ -209,9 +224,10 @@ def single_non_nan(x):
     elif len(non_nan) == 0:
         return "-"
     else:
-        raise ValueError(
-            f"Expected exactly one non-NaN value, got {len(non_nan)}"
-        )
+        assert all(
+            non_nan == non_nan.iloc[0]
+        ), f"Expected values for identical scenarios to be equal, got {non_nan}"
+        return non_nan.iloc[0]
 
 
 if __name__ == "__main__":
