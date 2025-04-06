@@ -54,7 +54,7 @@ IN9_CATEGORIES = [
     "bird",
     "wheeled vehicle",
     "reptile",
-    "carhivore",
+    "carnivore",
     "insect",
     "musical instrument",
     "primate",

@@ -49,6 +49,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath("")), "src"))
 # import densifier
 from occam.datasets.utils import open_pil_image, subpath, load_xml
 from occam.robust_classification.masking import (
+    DEFAULT_VISUAL_PROMPT_TYPE,
     apply_visual_prompts,
     # _build_timm_model,
     is_background,
@@ -418,7 +419,8 @@ def prepare_applied_mask_maker(image, mask):
         return apply_visual_prompts(
             image,
             mask,
-            visual_prompt_type=("rectangle_crop_resize", "naive_gray"),
+            # visual_prompt_type=("rectangle_crop_resize", "naive_gray"),
+            visual_prompt_type=DEFAULT_VISUAL_PROMPT_TYPE,
             enforce_square_shape=False,
         ).squeeze(0)
 
@@ -1102,7 +1104,8 @@ class ImageNetBBoxAnnotations(Dataset):
             applied_mask = apply_visual_prompts(
                 image.unsqueeze(0),
                 mask.unsqueeze(0),
-                visual_prompt_type=("naive_gray", "rectangle_crop_resize"),
+                # visual_prompt_type=("naive_gray", "rectangle_crop_resize"),
+                visual_prompt_type=DEFAULT_VISUAL_PROMPT_TYPE,
             )
 
         applied_mask = applied_mask.squeeze(0)

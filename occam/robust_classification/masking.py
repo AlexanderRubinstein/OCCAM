@@ -16,6 +16,7 @@ sys.path.pop(0)
 
 
 EPS = 1e-6
+DEFAULT_VISUAL_PROMPT_TYPE = ("crop_resize_gray",)
 
 
 # taken from Algorithm B here: https://arxiv.org/pdf/2312.07661
@@ -247,6 +248,83 @@ def apply_visual_prompts(
 
         prompted_image = prompted_image.numpy().transpose(1, 2, 0)
         prompted_image = np.ascontiguousarray(prompted_image, dtype=np.float32)
+
+    if "crop_resize_gray" in visual_prompt_type:
+        # print('rectangle_crop_resize')
+        # print("mask", mask.shape)
+        # print("inv_mask", inv_mask.shape)
+        # print("prompted_image", prompted_image.shape)
+
+        mask_center, mask_height, mask_width = mask2chw(
+            mask, enforce_square_shape=enforce_square_shape
+        )
+        center_coordinates = (mask_center[1], mask_center[0])
+        square_side = max(mask_height, mask_width)
+        start_point = (
+            mask_center[0] - square_side * 1 // 2,
+            mask_center[1] - square_side * 1 // 2,
+        )
+        # start_point = (
+        #     mask_center[0] - mask_height * 1 // 2,
+        #     mask_center[1] - mask_width * 1 // 2,
+        # )
+        # end_point = (
+        #     mask_center[1] + mask_width // 2,
+        #     mask_center[0] + mask_height // 2
+        # )
+        # height = start_point[0] - end_point[0]
+        # width = start_point[1] - end_point[1]
+        # torchvision.transforms.functional.crop(img: Tensor, top: int, left: int, height: int, width: int)\prompted_image
+        prompted_image = torch.Tensor(prompted_image.transpose(2, 0, 1))
+        resize_transform = torchvision.transforms.Resize(
+            prompted_image.shape[-2:],
+            interpolation=torchvision.transforms.InterpolationMode.BILINEAR
+            # interpolation=torchvision.transforms.InterpolationMode.NEAREST_EXACT,
+        )
+
+        mask = torch.Tensor(mask.transpose(2, 0, 1))
+        image_cropped = torchvision.transforms.functional.crop(
+            prompted_image,
+            start_point[0],
+            start_point[1],
+            # height,
+            # width
+            # mask_height,
+            # mask_width
+            square_side,
+            square_side,
+        )
+
+        mask_cropped = torchvision.transforms.functional.crop(
+            mask,
+            start_point[0],
+            start_point[1],
+            # height,
+            # width
+            # mask_height,
+            # mask_width
+            square_side,
+            square_side,
+        )
+        # print("prompted_image.shape", prompted_image.shape)
+        resized_image = resize_transform(image_cropped)
+        resized_mask = resize_transform(mask_cropped)
+
+        inv_resized_mask = 1 - resized_mask  # new
+        prompted_image = resized_image * resized_mask + 0.5 * inv_resized_mask
+
+        # if "naive_gray" in visual_prompt_type:
+        #     prompted_image[prompted_image == 0] = 0.5
+        #     # for i in range(1, prompted_image.shape[1] - 1):
+        #     #     for j in range(1, prompted_image.shape[2] - 1):
+        #     #         if abs(prompted_image[0, i - 1, j] - 0.5) < EPS and abs(prompted_image[0, i + 1, j] - 0.5) < EPS:
+        #     #             prompted_image[:, i, j] = 0.5
+        #     #         if abs(prompted_image[0, i, j - 1] - 0.5) < EPS and abs(prompted_image[0, i, j + 1] - 0.5) < EPS:
+        #     #             prompted_image[:, i, j] = 0.5
+
+        prompted_image = prompted_image.numpy().transpose(1, 2, 0)
+        prompted_image = np.ascontiguousarray(prompted_image, dtype=np.float32)
+
     prompted_image = prompted_image.transpose(2, 0, 1)[None, ...]
 
     if is_torch:
