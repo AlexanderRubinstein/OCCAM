@@ -435,9 +435,10 @@ def main():
         )
         _images_path = os.path.join(DATASETS_PATH, "ImageNet-val")
         _masks_path = os.path.join(
-            masks_base_dir, args.mask_source, f"in_val_masks.pkl"
+            masks_base_dir, args.mask_source, f"in_val_masks_v2.pkl"
         )
-        _bboxes_path = os.path.join(data_path, "bboxes_annotations", "in_val")
+        print("DEBUG: Remove v2 above")
+        _bboxes_path = os.path.join(data_path, "bboxes_annotations", "val")
         _masks_path = (_masks_path, _bboxes_path)
         split_images_masks.append(
             (
