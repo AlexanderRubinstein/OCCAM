@@ -62,6 +62,7 @@ from stuned.utility.utils import (
 
 
 MAX_COL_WIDTH = 1000
+MAX_ROWS = 1000
 
 
 def get_parser():
@@ -687,6 +688,7 @@ def main():
     pd.set_option(
         "display.max_colwidth", MAX_COL_WIDTH
     )  # to see long model names
+    pd.set_option("display.max_rows", MAX_ROWS)  # to see all results
     print(df)
 
 

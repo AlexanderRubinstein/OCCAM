@@ -17,11 +17,16 @@ sys.path.pop(0)
 from stuned.utility.utils import (
     get_with_assert,
     optionally_make_dir,
+    is_number,
 )
 
 
-NUM_LAST_LINES_IN_STDOUT = 10000
+NUM_LAST_LINES_IN_STDOUT = 100000
 MAX_COL_WIDTH = 1000
+ALPHA_CHANNEL = "$\\alpha$-channel"
+ALPHA_ONE = "($\\alpha$ = 1)"
+ALPHA_CLIP = "alpha_clip_ViT-L/14"
+CLIP = "clip_openai_ViT-L/14"
 
 
 def get_parser():
@@ -45,6 +50,7 @@ def get_parser():
 def parse_results_line(line, dataset_name):
     line = line.replace("mix_rand_", "")  # remove for ImageNet-9
     line = line.replace("clean_", "")  # remove for CounterAnimal clean
+    line = line.replace("bg_", "")
 
     if dataset_name == "counter_animal":
         dataset_name = line.split("_")[0]
@@ -86,9 +92,16 @@ def parse_results_line(line, dataset_name):
 
 
 def is_result_line(line, dataset_name):
+    line_split = line.split()
+    if len(line_split) < 2:
+        return False
     if dataset_name == "counter_animal":
-        return line.startswith("counter") or line.startswith("common")
-    return line.startswith(dataset_name)
+        start_match = line.startswith("counter") or line.startswith("common")
+        end_match = is_number(line_split[-2])
+    else:
+        start_match = line.startswith(dataset_name)
+        end_match = is_number(line_split[-1])
+    return start_match and end_match
 
 
 def main():
@@ -153,10 +166,10 @@ def main():
                         cur_mask_source == "cropformer"
                         or cur_mask_source == "dino_ft"
                     ):
-                        mask_method = "$\\alpha$-channel"
+                        mask_method = ALPHA_CHANNEL
                     else:
                         assert cur_mask_source == "-"
-                        mask_method = "($\\alpha$ = 1)"
+                        mask_method = ALPHA_ONE
                 else:
                     raise NotImplementedError(
                         f"Only clip models are supported for now, got {model}"
@@ -206,15 +219,95 @@ def main():
         {**{col: single_non_nan for col in dataset_cols}}
     )
 
+    table_4 = make_table_4(results_df)
+
+    # ordered_rows = [
+    #     [("arch", "CLIP"), ("mask_source", "-"), ("mask_method", "-"), ("fg_score", "-"), ("model", "clip_openai_ViT-L/14")],
+    # ]
+
+    # table_4 = None
+    # for row in ordered_rows:
+    #     row_4 = results_df
+    #     for key, value in row:
+    #         row_4 = row_4[row_4[key] == value]
+    #     if table_4 is None:
+    #         table_4 = row_4
+    #     else:
+    #         table_4 = pd.concat([table_4, row_4], ignore_index=True)
+
     pd.set_option(
         "display.max_colwidth", MAX_COL_WIDTH
     )  # to see long model names
 
     optionally_make_dir(args.result_folder, call_dirname=False)
-    print(results_df)
-    results_df.to_csv(
-        os.path.join(args.result_folder, "Table_4.csv"), index=False
+
+    table_4.to_csv(os.path.join(args.result_folder, "Table_4.csv"), index=False)
+    # print(results_df)
+    # results_df.to_csv(
+    #     os.path.join(args.result_folder, "Table_4.csv"), index=False
+    # )
+
+
+def make_table_4(results_df):
+    col_names = ["arch", "mask_method", "mask_source", "fg_score", "model"]
+    ordered_rows = [
+        ["CLIP", "-", "-", "-", CLIP],
+        #
+        ["CLIP", "Gray BG + Crop", "dino_ft", "max_prob", CLIP],
+        ["CLIP", "Gray BG + Crop", "dino_ft", "ens_entropy", CLIP],
+        ["CLIP", "Gray BG + Crop", "dino_ft", "oracle", CLIP],
+        #
+        ["CLIP", "Gray BG + Crop", "cropformer", "max_prob", CLIP],
+        ["CLIP", "Gray BG + Crop", "cropformer", "ens_entropy", CLIP],
+        ["CLIP", "Gray BG + Crop", "cropformer", "oracle", CLIP],
+        #
+        ["AlphaCLIP", ALPHA_ONE, "-", "-", ALPHA_CLIP],
+        #
+        ["AlphaCLIP", ALPHA_CHANNEL, "dino_ft", "max_prob", ALPHA_CLIP],
+        ["AlphaCLIP", ALPHA_CHANNEL, "dino_ft", "ens_entropy", ALPHA_CLIP],
+        ["AlphaCLIP", ALPHA_CHANNEL, "dino_ft", "oracle", ALPHA_CLIP],
+        #
+        ["AlphaCLIP", ALPHA_CHANNEL, "cropformer", "max_prob", ALPHA_CLIP],
+        ["AlphaCLIP", ALPHA_CHANNEL, "cropformer", "ens_entropy", ALPHA_CLIP],
+        ["AlphaCLIP", ALPHA_CHANNEL, "cropformer", "oracle", ALPHA_CLIP],
+        # [("arch", "CLIP"), ("mask_source", "-"), ("mask_method", "-"), ("fg_score", "-"), ("model", "clip_openai_ViT-L/14")],
+    ]
+
+    table_4 = None
+    for row in ordered_rows:
+        row_4 = results_df
+        for key, value in zip(col_names, row):
+            row_4 = row_4[row_4[key] == value]
+        if table_4 is None:
+            table_4 = row_4
+        else:
+            table_4 = pd.concat([table_4, row_4], ignore_index=True)
+
+    # Add delta column with difference between common and counter
+    table_4["delta"] = table_4.apply(
+        lambda row: float(row["common"]) - float(row["counter"])
+        if row["common"] != "-" and row["counter"] != "-"
+        else "-",
+        axis=1,
     )
+
+    cols_order = [
+        "arch",
+        "mask_source",
+        "mask_method",
+        "fg_score",
+        "waterbirds",
+        "imagenet_9",
+        "imagenet_d",
+        "urban_cars",
+        "delta",
+    ]
+    table_4 = table_4[cols_order]
+
+    # for i, row in table_4.iterrows():
+    #     row["model"] = row["model"].split("@")[0]
+
+    return table_4
 
 
 def single_non_nan(x):

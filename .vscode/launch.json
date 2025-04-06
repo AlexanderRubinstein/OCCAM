@@ -86,6 +86,19 @@
             ]
         },
         {
+            "name": "Python compute_uncertainty_results.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "./scripts/compute_uncertainty_results.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--clips",
+                "--filter_keyword",
+                "by_mask_size+by_background+by_num_connected_components",
+            ]
+        },
+        {
             "name": "Python download_datasets_and_checkpoints.py",
             "type": "debugpy",
             "request": "launch",
