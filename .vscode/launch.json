@@ -59,16 +59,17 @@
                 "--result_path",
                 "./data/results/eval_spurious/eval_debug.pkl",
                 // "--recompute_all",
-                "--ens_entropy",
+                // "--ens_entropy",
                 "--clip",
                 // "--siglip",
                 "--dataset_name",
                 // "imagenet_d",
-                // "waterbirds",
+                "waterbirds",
+                // "in_val",
                 // "urban_cars",
                 // "imagenet_9",
                 // "counter_animal",
-                "in_val",
+                // "in_val",
                 "--mask_source",
                 // "dino_ft",
                 "cropformer",
@@ -77,7 +78,9 @@
                 // "by_mask_size+by_border_touch+by_border_vs_area+by_top_area@5"
                 // "by_mask_size+by_border_touch+by_border_vs_area+by_top_area@10"
                 // "by_mask_size+by_border_touch+by_border_vs_area+by_aspect_ratio"
-                "by_mask_size+by_border_touch+by_border_vs_area+by_aspect_ratio+by_num_connected_components"
+                // "by_mask_size+by_border_touch+by_border_vs_area+by_aspect_ratio+by_num_connected_components"
+                "by_mask_size+by_background+by_num_connected_components",
+                // "by_mask_size+by_background+by_num_connected_components"
                 // "by_mask_size+by_border_touch+by_border_vs_area+by_num_connected_components"
                 // "by_mask_size+by_border_vs_area+by_num_connected_components"
             ]
@@ -89,6 +92,20 @@
             "program": "./scripts/download_datasets_and_checkpoints.py",
             "console": "integratedTerminal",
             "justMyCode": true,
+        },
+        {
+            "name": "Python make_tables.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "./scripts/make_tables.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--csv_with_results",
+                // "./sheets/robust_classification.csv"
+                "./sheets/robust_classification_filled.csv"
+
+            ]
         },
         {
             "name": "Python show_dataset via app.py",
@@ -103,11 +120,20 @@
                 "--path_within_config",
                 // "data/dataset_configs/bboxed_dataset_urban_cars",
                 "data/dataset_configs/bboxed_dataset_wb_group_3",
+                // "data/dataset_configs/bboxed_dataset_in_d",
                 // "data/dataset_configs/bboxed_dataset_wb_group_2",
+                // "data/dataset_configs/bboxed_dataset_in_9",
                 "--split",
                 "eval",
                 // "--hardcoded",
                 // "--images_list",
+                // "bg_n0144076",
+                // "1333",
+                // "63_14031",
+                // "0057_796286",
+                // "uaEZewU",
+                // "Ls9wDV",
+                // "t/8rMqx",
                 // "Gull_0131",
                 // "0066_796333",
                 // "Pomarine_Jaeger_0056",
@@ -119,6 +145,7 @@
                 // "dataset_task=classification;foreground_keyword=oracle---clip_openai_ViT-L/14;filter_keyword=by_mask_size",
                 //
                 "dataset_task=classification;foreground_keyword=oracle---clip_openai_ViT-L/14"
+                // "dataset_task=detection;foreground_keyword=oracle---clip_openai_ViT-L/14",
                 // "dataset_task=detection;foreground_keyword=oracle---clip_openai_ViT-L/14;filter_keyword=by_mask_size+by_border_touch+by_border_vs_area+by_num_connected_components"
                 // "dataset_task=classification;foreground_keyword=oracle---clip_openai_ViT-L/14;filter_keyword=by_mask_size+by_border_vs_area+by_num_connected_components"
             ]

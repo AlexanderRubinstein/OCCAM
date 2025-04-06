@@ -251,7 +251,7 @@ def add_clip_models(models_dict, category_list, dataset_name, siglip=False):
         add_openai_clip_model("ViT-L/14", category_list, models_dict)
         add_alpha_clip_model("ViT-L/14", category_list, models_dict)
         add_openai_clip_model("RN50", category_list, models_dict)
-        # print("Uncomment 2 above pls")
+        # print("DEBUG: Uncomment 2 above pls")
     if siglip:
         # add_openclip_model(
         #     model_id="ViT-SO400M-14-SigLIP-384",
@@ -500,8 +500,8 @@ def main():
 
         for group_id in range(len(WATERBIRDS_PATHS)):
             # if group_id != 3 and group_id != 2:
-            #     continue
-            # print(f"Uncomment above to run for group {group_id}")
+            # continue
+            # print(f"DEBUG: Uncomment above to run for group {group_id}")
             parquet_name = f"waterbirds_group_{group_id}"
             parquets[parquet_name] = (
                 os.path.join(

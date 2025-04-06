@@ -115,7 +115,7 @@ BORDER_VS_AREA_RATIO = 0.01
 NUM_CONNECTED_COMPONENTS_THRESHOLD = 30
 ASPECT_RATIO_THRESHOLD = 6
 NEW_MASK_VALUE = 0.5
-BACKGROUND_THRESHOLD = 3
+BACKGROUND_THRESHOLD = 6
 
 
 def extract_el_if_tuple(obj, i=0):
@@ -868,7 +868,7 @@ def eval_models(
             for group_id in range(len(WATERBIRDS_ONLY_FG_PATHS))
             # if group_id == 3 or group_id == 2
         ]
-        # print(f"Uncomment above to run for group if group_id != 3 and group_id != 2")
+        # print(f"DEBUG: Uncomment above to run for group if group_id != 3 and group_id != 2")
 
         dataset_name_path_list = (
             standard_wb_group_paths + only_fg_wb_group_paths
