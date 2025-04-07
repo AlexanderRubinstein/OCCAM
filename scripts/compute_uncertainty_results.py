@@ -17,9 +17,7 @@ import matplotlib.pyplot as plt
 # from stuned.utility.utils import get_project_root_path, load_from_pickle
 
 
-sys.path.insert(
-    0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src")
-)
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__))))
 # import densifier  # for setting the variable with project root
 
 # sys.path.insert(0, os.path.join(get_project_root_path(), "notebooks"))
@@ -66,6 +64,7 @@ from occam.ood_detection.uncertainty_scores import (
     ens_conf_per_sample,
     get_probs,
 )
+from occam.datasets.utils import DATA_PATH
 from occam.datasets.bboxed_dataset import make_bboxed_dataset_from_config
 from occam.datasets.imagenet_classes import get_in_classes_prompts
 from occam.robust_classification.models import clip_models_with_same_preprocess
@@ -93,8 +92,8 @@ from stuned.local_datasets.transforms import (
     make_default_train_transforms_imagenet,
 )
 
-CUR_DIR = os.path.abspath("")
-DATA_PATH = os.path.join(os.path.dirname(CUR_DIR), "data")
+# CUR_DIR = os.path.abspath("")
+# DATA_PATH = os.path.join(os.path.dirname(CUR_DIR), "data")
 
 # DEFAULT_MEAN = [0.485, 0.456, 0.406]
 # DEFAULT_STD = [0.229, 0.224, 0.225]
@@ -444,7 +443,7 @@ def main():
             DATA_PATH,
             "csvs",
             "cropformer",
-            "source_in_val_cropformer.parquet",
+            f"source_in_val_{args.filter_keyword}.parquet",
         ),
         #   "csv_path": "/home/oh/arubinstein17/github/densification/data/csvs/cropformer/source_urban_cars_cropformer.parquet", # to speed up debug
         # csv_path: /home/oh/arubinstein17/github/densification/data/csvs/counter_debug.parquet

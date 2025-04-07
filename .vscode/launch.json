@@ -96,6 +96,8 @@
                 "--clips",
                 "--filter_keyword",
                 "by_mask_size+by_background+by_num_connected_components",
+                "--result_path",
+                "./data/results/uncertainty_scores/5models_ensemble_debug.pkl"
             ]
         },
         {

@@ -158,6 +158,8 @@ def main():
                 if fg_score == "None":
                     fg_score = "-"
                     cur_mask_source = "-"
+                elif fg_score == "only_fg":
+                    cur_mask_source = "-"
                 else:
                     cur_mask_source = mask_source
 
@@ -461,9 +463,10 @@ def make_table_5(results_df):
     ordered_rows = [
         ["CLIP", "-", "-", "-", CLIP],
         # ["CLIP", "Gray BG + Crop", "dino_ft", "oracle", CLIP],
+        ["CLIP", "Gray BG + Crop", "cropformer", "max_prob", CLIP],
         ["CLIP", "Gray BG + Crop", "cropformer", "ens_entropy", CLIP],
         ["CLIP", "Gray BG + Crop", "cropformer", "oracle", CLIP],
-        ["CLIP", "Gray BG + Crop", "dino_ft", "only_fg", CLIP],
+        ["CLIP", "-", "-", "only_fg", CLIP],
     ]
 
     # table = None
