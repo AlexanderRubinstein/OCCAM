@@ -1,0 +1,55 @@
+2025-04-06 21:06:54.893806 (error): ./envs/occam/lib/python3.10/site-packages/open_clip/factory.py:388: UserWarning: These pretrained weights were trained with QuickGELU activation but the model config does not have that enabled. Consider using a model config with a "-quickgelu" suffix or enable with a flag.
+  warnings.warn(
+./envs/occam/lib/python3.10/site-packages/open_clip/factory.py:388: UserWarning: These pretrained weights were trained with QuickGELU activation but the model config does not have that enabled. Consider using a model config with a "-quickgelu" suffix or enable with a flag.
+  warnings.warn(
+
+2025-04-06 21:07:07.094342 (error): Traceback (most recent call last):
+  File "~/github/STAI-tuned/src/stuned/utility/utils.py", line 1316, in wrapped_func
+    return func(*args, **kwargs)
+  File "~/github/STAI-tuned/src/stuned/utility/logger.py", line 1646, in sync_local_file_with_gdrive
+    remote_file.Upload()
+  File "./envs/occam/lib/python3.10/site-packages/pydrive2/files.py", line 510, in Upload
+    self._FilesUpdate(param=param)
+  File "./envs/occam/lib/python3.10/site-packages/pydrive2/auth.py", line 85, in _decorated
+    return decoratee(self, *args, **kwargs)
+  File "./envs/occam/lib/python3.10/site-packages/pydrive2/files.py", line 827, in _FilesUpdate
+    self.auth.service.files()
+  File "./envs/occam/lib/python3.10/site-packages/googleapiclient/_helpers.py", line 130, in positional_wrapper
+    return wrapped(*args, **kwargs)
+  File "./envs/occam/lib/python3.10/site-packages/googleapiclient/http.py", line 902, in execute
+    _, body = self.next_chunk(http=http, num_retries=num_retries)
+  File "./envs/occam/lib/python3.10/site-packages/googleapiclient/_helpers.py", line 130, in positional_wrapper
+    return wrapped(*args, **kwargs)
+  File "./envs/occam/lib/python3.10/site-packages/googleapiclient/http.py", line 1007, in next_chunk
+    resp, content = _retry_request(
+  File "./envs/occam/lib/python3.10/site-packages/googleapiclient/http.py", line 222, in _retry_request
+    raise exception
+  File "./envs/occam/lib/python3.10/site-packages/googleapiclient/http.py", line 191, in _retry_request
+    resp, content = http.request(uri, method, *args, **kwargs)
+  File "./envs/occam/lib/python3.10/site-packages/oauth2client/transport.py", line 173, in new_request
+    resp, content = request(orig_request_method, uri, method, body,
+  File "./envs/occam/lib/python3.10/site-packages/oauth2client/transport.py", line 280, in request
+    return http_callable(uri, method=method, body=body, headers=headers,
+  File "./envs/occam/lib/python3.10/site-packages/httplib2/__init__.py", line 1724, in request
+    (response, content) = self._request(
+  File "./envs/occam/lib/python3.10/site-packages/httplib2/__init__.py", line 1444, in _request
+    (response, content) = self._conn_request(conn, request_uri, method, body, headers)
+  File "./envs/occam/lib/python3.10/site-packages/httplib2/__init__.py", line 1396, in _conn_request
+    response = conn.getresponse()
+  File "./envs/occam/lib/python3.10/http/client.py", line 1368, in getresponse
+    response.begin()
+  File "./envs/occam/lib/python3.10/http/client.py", line 317, in begin
+    version, status, reason = self._read_status()
+  File "./envs/occam/lib/python3.10/http/client.py", line 278, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+  File "./envs/occam/lib/python3.10/socket.py", line 705, in readinto
+    return self._sock.recv_into(b)
+  File "./envs/occam/lib/python3.10/ssl.py", line 1273, in recv_into
+    return self.read(nbytes, buffer)
+  File "./envs/occam/lib/python3.10/ssl.py", line 1129, in read
+    return self._sslobj.read(len, buffer)
+ssl.SSLError: [SSL: DECRYPTION_FAILED_OR_BAD_RECORD_MAC] decryption failed or bad record mac (_ssl.c:2536)
+
+Retrying sync_local_file_with_gdrive: 1/10.
+
+

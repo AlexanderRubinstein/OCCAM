@@ -1,0 +1,79 @@
+data:
+  dataset_configs:
+    bboxed_dataset_urban_cars:
+
+      train_transform: null
+      eval_transform:
+          from_class-Normalize:
+            class: torchvision.transforms.Normalize
+            kwargs:
+              mean:
+              - 0.485
+              - 0.456
+              - 0.406
+              std:
+              - 0.229
+              - 0.224
+              - 0.225
+          from_class-ToTensor:
+            class: torchvision.transforms.ToTensor
+          transforms_list:
+            - from_class-ToTensor
+            - from_class-Normalize
+
+      train_val_split: 0.0
+
+      csv_path: ./data/csvs/cropformer/source_urban_cars_by_mask_size+by_background+by_num_connected_components.parquet
+      dataset_task: classification
+      label_converter: "./jsons/uc_label_converter.pt"
+      foreground_keyword: by_mask_size+by_background+by_num_connected_components
+    bboxed_dataset_wb_group_3: # waterbird on water bg
+
+      train_transform: null
+      eval_transform: copy@data/dataset_configs/bboxed_dataset_urban_cars/eval_transform
+      train_val_split: 0.0
+      csv_path: ./data/csvs/cropformer/source_waterbirds_group_3_by_mask_size+by_background+by_num_connected_components.parquet
+      dataset_task: classification
+      label_converter: "./jsons/wb_label_converter.pt"
+      foreground_keyword: null
+      filter_keyword: by_mask_size+by_background+by_num_connected_components
+
+    bboxed_dataset_wb_group_2: # waterbird on land bg
+
+      train_transform: null
+      eval_transform: copy@data/dataset_configs/bboxed_dataset_urban_cars/eval_transform
+      train_val_split: 0.0
+      csv_path: ./data/csvs/cropformer/source_waterbirds_group_2_by_mask_size+by_background+by_num_connected_components.parquet
+      dataset_task: classification
+      label_converter: "./jsons/wb_label_converter.pt"
+      foreground_keyword: by_mask_size+by_background+by_num_connected_components
+
+    bboxed_dataset_in_d:
+
+      train_transform: null
+      eval_transform: copy@data/dataset_configs/bboxed_dataset_urban_cars/eval_transform
+      train_val_split: 0.0
+      csv_path: ./data/csvs/cropformer/source_imagenet_d_bg_cropformer_by_mask_size+by_background+by_num_connected_components.parquet
+      dataset_task: classification
+      label_converter: ./jsons/in_d_label_converter.pt
+      foreground_keyword: by_mask_size+by_background+by_num_connected_components
+
+    bboxed_dataset_in_9:
+
+      train_transform: null
+      eval_transform: copy@data/dataset_configs/bboxed_dataset_urban_cars/eval_transform
+      train_val_split: 0.0
+      csv_path: ./data/csvs/cropformer/source_imagenet_9_mix_rand_cropformer_by_mask_size+by_background+by_num_connected_components.parquet
+      dataset_task: classification
+      label_converter: ./jsons/in_9_label_converter.pt
+      foreground_keyword: by_mask_size+by_background+by_num_connected_components
+
+    bboxed_dataset_counter:
+
+      train_transform: null
+      eval_transform: copy@data/dataset_configs/bboxed_dataset_urban_cars/eval_transform
+      train_val_split: 0.0
+      csv_path: ./data/csvs/cropformer/source_counter_animal_counter_by_mask_size+by_background+by_num_connected_components.parquet
+      dataset_task: classification
+      label_converter: null
+      foreground_keyword: by_mask_size+by_background+by_num_connected_components
