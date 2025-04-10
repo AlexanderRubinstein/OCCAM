@@ -32,7 +32,7 @@ data:
       train_transform: null
       eval_transform: copy@data/dataset_configs/bboxed_dataset_urban_cars/eval_transform
       train_val_split: 0.0
-      csv_path: /home/oh/arubinstein17/github/OCCAM/data/csvs/cropformer/source_waterbirds_group_3_by_mask_size+by_background+by_num_connected_components.parquet
+      csv_path: ./data/csvs/cropformer/source_waterbirds_group_3_by_mask_size+by_background+by_num_connected_components.parquet
       dataset_task: classification
       label_converter: "./jsons/wb_label_converter.pt"
       foreground_keyword: null

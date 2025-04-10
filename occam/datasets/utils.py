@@ -14,8 +14,6 @@ import pandas as pd
 
 from stuned.utility.utils import (
     get_project_root_path,
-    # get_with_assert,
-    # raise_unknown,
     str_is_number,
     load_from_pickle,
     optionally_make_dir,
@@ -23,32 +21,12 @@ from stuned.utility.utils import (
 from stuned.local_datasets.imagenet1k import (
     DEFAULT_MEAN,
     DEFAULT_STD,
-    # get_imagenet_dataloaders
 )
 
 
 # local modules
 sys.path.insert(0, get_project_root_path())
-# import densifier
 import occam
-
-# from densifier.datasets.imagenet_classes import get_in_classes_prompts
-# from densifier.utility.utils_for_notebooks import (
-#     visualize_images_side_by_side,
-#     tensor_for_matplotlib,
-#     unnormalize,
-#     load_data
-# )
-# from densifier.datasets.bboxed_dataset import (
-#     get_bboxed_dataloaders
-# )
-# from occam.datasets.bboxed_dataset import (
-#     make_bboxed_dataset_from_config,
-#     get_mask_id_prefix,
-#     make_bbox,
-#     compute_bbox_fit_score,
-#     subpath
-# )
 sys.path.pop(0)
 
 
@@ -170,49 +148,6 @@ def make_to_classes_mapping(
     return ToClassesMapping(indices_for_category, aggregation_function)
 
 
-# # TODO(Alex | 17.01.2024): make this non-experimental
-# # by directly accessing methods like "to" and "eval" from inner_object
-# # maybe don't even need to inherit from torch.nn.Module,
-# # just return isinstance of inner_object?
-# class ModuleDelegatingWrapper(torch.nn.Module):
-
-#     def __init__(self, inner_object):
-#         super().__init__()
-
-#         object.__setattr__(self, CUSTOM_ATTRS_KEY, {})
-#         attrs = self.get_custom_attrs()
-#         attrs[INNER_OBJECT_KEY] = inner_object
-
-#     def __getattr__(self, name):
-
-#         inner_object = self.get_inner_object()
-#         object.__getattribute__(inner_object, name)
-
-#     def get_inner_object(self):
-#         attrs = self.get_custom_attrs()
-#         return attrs[INNER_OBJECT_KEY]
-
-#     def get_custom_attrs(self):
-#         return object.__getattribute__(self, CUSTOM_ATTRS_KEY)
-
-#     def __setattr__(self, key, value):
-
-#         inner_object = self.get_inner_object()
-#         setattr(inner_object, key, value)
-
-#     def to(self, *args):
-#         inner_object = self.get_inner_object()
-#         inner_object.to(*args)
-
-#     def train(self, *args):
-#         inner_object = self.get_inner_object()
-#         inner_object.train(*args)
-
-#     def eval(self, *args):
-#         inner_object = self.get_inner_object()
-#         inner_object.eval(*args)
-
-
 class ModuleDelegatingWrapper(torch.nn.Module):
     def __init__(self, inner_module: torch.nn.Module):
         """
@@ -262,22 +197,11 @@ class ModelClassesWrapper(ModuleDelegatingWrapper):
     def __init__(self, model, make_mapper):
         super().__init__(model)
         self.mapper = make_mapper()
-        # self.softmax = torch.nn.Softmax(dim=-1)
-        # attrs = self.get_custom_attrs()
-        # attrs["softmax"] = torch.nn.Softmax(dim=-1)
-        # attrs["mapper"] = make_mapper()
 
     def __call__(self, x):
-        # attrs = self.get_custom_attrs()
-        # underlying_model = self.get_inner_object()
-        # softmax = attrs["softmax"]
-        # mapper = attrs["mapper"]
 
         logits = self.inner_module(x)
-        # probs = self.softmax(logits)
 
-        # TODO(Alex | 19.12.2024): make sure that applying mapper to logits
-        # instead of probs does not cause problems
         return self.mapper(logits)
 
 
@@ -300,7 +224,7 @@ def get_collate_fn_in_d(drop_paths):
 
 
 def make_custom_folder_path2label(dataset_path):
-    # dataset_path = "/home/oh/arubinstein17/github/densification/data/CounterAnimal/symlinked/counter"
+
     transform = None
     return_path = True
     masks = None
@@ -314,10 +238,6 @@ def make_custom_folder_path2label(dataset_path):
         mask_transform=mask_transform,
     )
 
-    # res = []
-    # for item in tqdm(dataset):
-    #     res.append([item[2], item[1]])
-    # return res
     return dataset.samples
 
 
@@ -340,10 +260,6 @@ class CustomImageFolder(ImageFolder):
                 resize_from_mask = resize_from_image
             else:
                 resize_from_image_size = resize_from_image.size
-            # assert resize_from_image_size == resize_from_mask.size, \
-            #     f"Resize sizes should be the same: {resize_from_image.size} vs {resize_from_mask.size}"
-            # assert resize_from_image.interpolation == resize_from_mask.interpolation, \
-            #     "Resize interpolations should be the same"
 
     def __getitem__(self, index: int):
         path, target = self.samples[index]
@@ -366,7 +282,6 @@ class CustomImageFolder(ImageFolder):
             mask = self.masks[mask_id]["mask"]
             if self.mask_transform is not None:
                 mask = self.mask_transform(mask)
-                # mask = einops.repeat(mask, 'b c h w -> b (repeat c) h w', repeat=3)
                 assert len(mask.shape) == 3
                 mask = mask.repeat(3, 1, 1)
             return_value.append(mask)
@@ -385,7 +300,6 @@ class CustomImageFolder(ImageFolder):
             else:
                 class_id = i
             class_to_idx[class_name] = class_id
-        # class_to_idx = {class_name: int(class_name) for class_name in classes}
         return classes, class_to_idx
 
 
@@ -434,26 +348,19 @@ def make_mapping_dict_generic(
     separate_masks_folder,
     path2label_func,
 ):
-    # path2label = make_path2label_imagenet_d(images_folder)
-    # path2label = make_path2label_counter_animal(images_folder)
     dataset_kwargs = {}
     if isinstance(images_folder, (list, tuple)):
         images_folder, dataset_kwargs = images_folder
-    # path2label = make_path2label_in_d(images_folder, **dataset_kwargs)
     path2label = path2label_func(images_folder)
-    # path2label_counter = make_path2label_counter_animal("/home/oh/arubinstein17/github/densification/data/CounterAnimal/symlinked/counter_mislabeled_siglip")
 
-    # mapping_dict_counter = make_mapping_dict(
     if isinstance(masks_path, (list, tuple)):
         masks_path, bboxes_path = masks_path
 
-    # TODO(Alex | 03.12.2024): rename func to more generic as it is not counter_animal specific
     mapping_dict = make_mapping_dict_from_folder(
         path2label=path2label,
         masks_path=masks_path,
         separate_masks_folder=separate_masks_folder,
         bboxes_path=bboxes_path,
-        # assert_shape=True
     )
     return mapping_dict
 
@@ -488,8 +395,6 @@ def make_mapping_dict_from_folder(
                         is True and the image and mask shapes do not match.
         NotImplementedError: If `bboxes_path` is provided (functionality for handling bounding boxes is not implemented).
     """
-    # def subpath(path, k):
-    #     return "".join(path.split(os.sep)[-k:])
 
     def get_bbox_path(path, bboxes_folder):
         if os.path.basename(bboxes_folder) == "val":
@@ -516,24 +421,17 @@ def make_mapping_dict_from_folder(
         renamed_masks[subpath(key, 2)] = value
 
     masks = renamed_masks
-    # assert bboxes_path is None, "Not implemented"
+
     os.makedirs(separate_masks_folder, exist_ok=True)
     for path, label in tqdm(path2label):
-        # mask_id = path[1:]
         mask_id = subpath(path, 2)
 
-        # print(mask_id)
-        # print(masks.keys())
-
         assert mask_id in masks
-        # key = path
 
         mask = masks[mask_id]["mask"]
 
         if assert_shape:
             image = open_pil_image(path)
-            # print("image:", image.shape)
-            # print("mask:", mask.shape)
 
             assert image.shape[:-1] == mask.shape
 
@@ -541,11 +439,9 @@ def make_mapping_dict_from_folder(
             bbox_path = None
         else:
             bbox_path = get_bbox_path(path, bboxes_path)
-            # assert False, "Not implemented"
 
         mask_path = os.path.join(
             separate_masks_folder,
-            # os.path.basename(path).split(".")[0] + ".mask"
             make_mask_name_from_path(path),
         )
 
@@ -585,19 +481,14 @@ def make_source_df(mapping_dict):
         bbox_path = image_data[1]
         image_label = image_data[2]
 
-        # assert bbox_path is None
         assert mask_path is not None
 
-        # shape_mismatch_info = None
-        # mask_value_for_main_object = 0
         main_object_label = 1
         masks = torch.load(mask_path, weights_only=False)
 
         all_mask_values = np.unique(masks).tolist()
-        # metadata = {}
 
         for mask_value in all_mask_values:
-            # metadata_key = str(mask_value)
 
             res["source_image_path"].append(image_path)
             res["classification_label"].append(image_label)
@@ -608,10 +499,6 @@ def make_source_df(mapping_dict):
             res["bbox_path"].append(bbox_path)
             res["metadata"].append(None)
 
-        # if len(res["source_image_path"]) > 100:
-        #     break # tmp 2
-
-    # print("Shape mismatches:\n", shape_mismatches)
     df = pd.DataFrame(res)
     return df
 

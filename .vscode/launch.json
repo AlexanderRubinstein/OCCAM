@@ -107,6 +107,9 @@
             "program": "./scripts/download_datasets_and_checkpoints.py",
             "console": "integratedTerminal",
             "justMyCode": true,
+            "args": [
+                "--ignore_image_net_val"
+            ]
         },
         {
             "name": "Python make_tables.py",

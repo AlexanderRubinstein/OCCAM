@@ -1,18 +1,18 @@
 # Are We Done with Object-Centric Learning?
 
-- Remove this: gdrive_storage_folder: https://drive.google.com/drive/folders/1bCKbgY29CXsgYSwBHk49weolkA5cBePT?usp=share_link
+![Are We Done with Object-Centric Learning?](./figures/teaser.png "Are We Done with Object-Centric Learning?")
 
 ## Overview
 
-![Are We Done with Object-Centric Learning?](./figures/teaser.png "Are We Done with Object-Centric Learning?")
+This is an implementation of the paper [Are We Done with Object-Centric Learning?](https://arxiv.org/abs/2504.07092).
 
-This is an implementation of the paper Are We Done with Object-Centric Learning? [REF].
+Object-centric learning (OCL) has focused on developing unsupervised mechanisms to separate the representation space into discrete slots. However, the inherent challenges of this task have led to comparatively less emphasis on exploring downstream applications, and exploring fundamental benefits. In our paper, we introduce simple, effective OCL mechanism - Object-Centric Classification with Applied Masks (OCCAM) to separate objects in pixel space and encode them independently. There are two main parts. The first part uses entity segmentation masks for object-centric representation generation. The second part performs robust classification by selecting representations corresponding to the foreground object and using them for classification.
 
-[FILL][explanation for OCCAM]
+We present a case study on the downstream benefits of OCCAM. It shows how object-centric representations from foundational segmentation models help reduce spurious correlations outperforming those from OCL methods.
 
 The sections below has the following contents. In the section ["Installation"](#installation) we explain how to create a conda environment with all the necessary libraries. The section ["Download datasets and checkpoints"](#download-datasets-and-checkpoints) describe how to download datasets and models correspondingly. The section ["Evaluate on robust classification"](#evaluate-robust-classification) explains how to evaluate the models and reproduce the results for robust classification reported in the paper. The section ["Note about stuned.run_from_csv.py and .csv files"](#note-about-stunedrun_from_csvpy-and-csv-files) gives additional information about the scripts running pipeline we use in this repository.
 
-Note: All commands are supposed to be run from the root of this repository and all paths are given relatively to it.
+Note: All commands are supposed to be run from the root of this repository and all paths are given relatively to it with occam conda environment activated.
 
 ## Installation
 
@@ -24,54 +24,90 @@ To create and activate a conda environment with `Python 3.10.0` run the followin
 mkdir ./envs && conda create --yes --prefix ./envs/occam python==3.10.0
 conda activate ./envs/occam/
 pip install -r requirements.txt
+
+# the commands below are needed only if mask generation with HQES is planned.
+# They require GCC 9+ for building detectron2
+# as well as relevant `CUDA_HOME`, `LD_LIBRARY_PATH`, `CPATH`, `CFLAGS`,
+# and `LDFLAGS` environment variables for compiling CUDA kernel
+pip install git+https://github.com/facebookresearch/detectron2.git
 cd occam/get_segments/modeling/pixel_decoder/ops/ && bash make.sh
 ```
 
-Note: Installation of libraries needed for [High-Quality Entity Segmenta-
-tion (HQES)]([FILL][link HQES paper]) requires compiling CUDA kernel, therefore it requires `CUDA_HOME` environment variable to be set.
+## Reproduce results from the paper
+
+To reproduce robust classification results please run this command:
+
+```
+python scripts/make_tables.py
+```
+
+It will parse the logs of the runs stored in the `experiments` folder
+and generate tables with evaluation results matching the table names in the paper:
+
+```
+📦data
+┗ 📂results
+  ┗ 📂robust_classification
+    ┣ 📜Table_2a.csv
+    ┣ 📜Table_2b.csv
+    ┣ 📜Table_2c.csv
+    ┣ 📜Table_2d.csv
+    ┣ 📜Table_3.csv
+    ┣ 📜Table_4.csv
+    ┗ 📜Table_5.csv
+```
+
+If you want to regenerate those logs yourself, you will need to follow the instructions
+from the following sections (order matters):
+["Download datasets and checkpoints"](#download-datasets-and-checkpoints),
+["Generate masks"](#generate-masks),
+["Evaluate robust classification"](#evaluate-robust-classification)
+
+To plot the ROC-curves for OOD detection, please run all cells in sections `Imports`, `Functions` and `CLIP confidences` of jupyter notebook `./notebooks/ood_det.ipynb`. It makes this plot by using precomputed Class-Aided, IoU and uncertainty scores stored in `data/results/ood_detection` and `data/results/uncertainty_scores`.
+
+If you want to regenerate those scores, you will need to follow the same instructions
+for robust classification results + instructions from ["Compute uncertainty scores"](#compute-uncertainty-scores) (order matters).
+
+Please note that results may differ depending on the [CUDA](https://developer.nvidia.com/cuda-toolkit) version, the results above are computed for CUDA 12.2.
+
+Note: Currently we provide only robust classification results.
+Results for segmentation experiments are currently not supported because they were computed using the [fork](https://github.com/AlexanderRubinstein/object-centric-learning-framework) of the separate repository. We can add code and commands to reproduce other results by request if there are enough people interested.
 
 ## Download datasets and checkpoints
 
-To download the datasets ([FILL][GB]) and model checkpoints ([FILL][GB]) needed for evaluation please run the following command (see ["Folder structure"](#folder-structure) for details of the resulting folders structure):
+To download the datasets (~6GB) and model checkpoints (~2GB) needed for evaluation please run the following command (see ["Folder structure"](#folder-structure) for details of the resulting folders structure):
 
 ```
 python scripts/download_datasets_and_checkpoints.py
 ```
 
-Note: ImageNet Validation [REF] set is not downloaded automatically by the script above, therefore you should manually download (e.g. [from Kaggle](https://www.kaggle.com/code/joaoparana/download-imagenet-validation-set)) or symlink it to `data/datasets/ImageNet-val`.
+Note: [ImageNet Validation](https://arxiv.org/abs/1409.0575) set is not downloaded automatically by the script above as it is too big, therefore you should manually download it (e.g. [from Kaggle](https://www.kaggle.com/code/joaoparana/download-imagenet-validation-set)) or symlink it to `data/datasets/ImageNet-val`.
 
 ### Folder structure
 
 Upon a successful completion of the script `scripts/download_datasets_and_checkpoints.py` `data` folder will be created and will have the following structure:
 
-[FILL][Make relevant structure]
 ```
 📦data
-┗ 📂datasets
-  ┗ 📂cached
-    ┣ 📂Brightness_1
-    ┃ ┗ 📜4c905e75df34398dcc32_...50000_samples.hdf5
-    ┣ 📂Brightness_5
-    ┃ ┗ 📜ef1173603b558d0a45ac_...50000_samples.hdf5
-    ...
-    ┣ 📂Zoom Blur_5
-    ┃ ┗ 📜3f50303a2e87f30cba0c_torch_...50000_samples.hdf5
-    ┣ 📜in_a_deit3b_-1_.hdf5
-    ┣ 📜in_r_deit3b_-1_.hdf5
-    ┣ 📜in_train_deit3b_-1_4_epochs.hdf5
-    ┣ 📜in_val_deit3b_-1.hdf5
-    ┣ 📜inat_deit3b_-1_.hdf5
-    ┗ 📜oi_deit3b_-1_.hdf5
-
+┗ 📂bboxes_annotations
+┣ 📂datasets
+┃ ┣ 📂CounterAnimal
+┃ ┣ 📂Imagenet-9
+┃ ┣ 📂Imagenet-D
+┃ ┣ 📂UrbanCars
+┃ ┗ 📂Waterbirds
+┗ 📂results
 ```
 
 In addition to that `checkpoints` folder will also be created and will have the following structure:
 
-[FILL][Make relevant structure]
 ```
-📦data
-┗ 📂datasets
-  ┗ 📂cached
+📦checkpoints
+┗ 📜clip_l14_grit20m_fultune_2xe.pth
+┗ 📜CropFormer_hornet_3x_03823a.pth
+```
+
+  <!-- ┗ 📂cached
     ┣ 📂Brightness_1
     ┃ ┗ 📜4c905e75df34398dcc32_...50000_samples.hdf5
     ┣ 📂Brightness_5
@@ -84,39 +120,27 @@ In addition to that `checkpoints` folder will also be created and will have the 
     ┣ 📜in_train_deit3b_-1_4_epochs.hdf5
     ┣ 📜in_val_deit3b_-1.hdf5
     ┣ 📜inat_deit3b_-1_.hdf5
-    ┗ 📜oi_deit3b_-1_.hdf5
+    ┗ 📜oi_deit3b_-1_.hdf5 -->
 
-```
-
-After following the steps from the section ["Generate masks"](#generate-masks) additional folders [FILL][Folder names] will be created inside `data` folder, so that its resulting structure will be the following:
+After following the steps from the section ["Generate masks"](#generate-masks) additional folders `masks` and `tars` will be created inside `data` folder, so that its resulting structure will be the following:
 
 ```
 📦data
-┗ 📂datasets
-  ┗ 📂cached
-    ┣ 📂Brightness_1
-    ┃ ┗ 📜4c905e75df34398dcc32_...50000_samples.hdf5
-    ┣ 📂Brightness_5
-    ┃ ┗ 📜ef1173603b558d0a45ac_...50000_samples.hdf5
-    ...
-    ┣ 📂Zoom Blur_5
-    ┃ ┗ 📜3f50303a2e87f30cba0c_torch_...50000_samples.hdf5
-    ┣ 📜in_a_deit3b_-1_.hdf5
-    ┣ 📜in_r_deit3b_-1_.hdf5
-    ┣ 📜in_train_deit3b_-1_4_epochs.hdf5
-    ┣ 📜in_val_deit3b_-1.hdf5
-    ┣ 📜inat_deit3b_-1_.hdf5
-    ┗ 📜oi_deit3b_-1_.hdf5
-
+┗ 📂bboxes_annotations
+┣ 📂datasets
+┃ ┣ 📂CounterAnimal
+┃ ┣ 📂Imagenet-9
+┃ ┣ 📂Imagenet-D
+┃ ┣ 📂UrbanCars
+┃ ┗ 📂Waterbirds
+┗ 📂results
+┗ 📂masks
+┗ 📂tars
 ```
-
-[FILL][Make relevant structure]
 
 ## Generate masks
 
 In this section we generate masks to compute outputs of the mask generator in OCCAM pipeline. Later we will use them for robust classification in ["Evaluate robust classification"](#evaluate-robust-classification).
-
-[FILL][copy data from filled to non-filled csv, remove de-anonymizing login names + remove all slurm-related fields from the filled csv]
 
 Make sure that `data` and `checkpoints` folders have the structure described in ["Folder structure"](#folder-structure).
 
@@ -126,7 +150,7 @@ To generate the masks run the following command (see ["Note about stuned.run_fro
 export ROOT=./ && export ENV=$ROOT/envs/occam && export PROJECT_ROOT_PROVIDED_FOR_STUNED=$ROOT && conda activate $ENV && python -m stuned.run_from_csv --conda_env $ENV --csv_path $ROOT/sheets/mask_generation.csv --run_locally --n_groups 1
 ```
 
-Upon a successful scripts completion `./sheets/mask_generation.csv` will look like `./sheets/mask_generation_filled.csv` and the file subfolders [FILL] will be created in `data` folder.
+Upon a successful scripts completion `./sheets/mask_generation.csv` will look like `./sheets/mask_generation_filled.csv` and the file subfolders `masks` and `tars` will be created in `data` folder (see ["Folder structure"](#folder-structure) for details).
 
 ## Evaluate robust classification
 
@@ -140,24 +164,30 @@ To evaluate the models run the command (see ["Note about stuned.run_from_csv.py 
 export ROOT=./ && export ENV=$ROOT/envs/occam && export PROJECT_ROOT_PROVIDED_FOR_STUNED=$ROOT && conda activate $ENV && python -m stuned.run_from_csv --conda_env $ENV --csv_path $ROOT/sheets/robust_classification.csv --run_locally --n_groups 1
 ```
 
-Upon a successful scripts completion `sheets/robust_classification.csv` will look like `sheets/robust_classification_filled.csv`.
+Upon a successful scripts completion `sheets/robust_classification.csv` will look like `sheets/robust_classification_filled.csv` and will be ready for steps described in [Reproduce results from the paper](#reproduce-results-from-the-paper).
 
-The accuracies can be seen in the end of <run_folder>/stdout.txt file, where <run_folder> are the paths from `run_folder` column in `./sheets/robust_classification.csv` table.
+## Compute uncertainty scores
 
-E.g. accuracy of OCCAM with FT-Dinosaur masks on ImageNet-D dataset that reproduce rows from [FILL][TABLE] are the following:
+In pre-compute scores needed for reproducing the OOD detection results.
 
-[FILL][TABLE row + copy from stdout]
+Make sure that `data` and `checkpoints` folders have the structure described in ["Folder structure"](#folder-structure).
+
+To evaluate the models run the command (see ["Note about stuned.run_from_csv.py and .csv files"](#note-about-stunedrun_from_csvpy-and-csv-files) for details):
+
+```
+export ROOT=./ && export ENV=$ROOT/envs/occam && export PROJECT_ROOT_PROVIDED_FOR_STUNED=$ROOT && conda activate $ENV && python -m stuned.run_from_csv --conda_env $ENV --csv_path $ROOT/sheets/compute_uncertainty.csv --run_locally --n_groups 1
+```
+
+Upon a successful scripts completion `sheets/compute_uncertainty.csv` will look like `sheets/compute_uncertainty_filled.csv` and will be ready for steps described in [Reproduce results from the paper](#reproduce-results-from-the-paper).
+
+<!-- The accuracies can be seen in the end of <run_folder>/stdout.txt file, where <run_folder> are the paths from `run_folder` column in `./sheets/robust_classification.csv` table.
+
+E.g. accuracy of OCCAM with FT-Dinosaur masks on ImageNet-D dataset that reproduce rows from are the following:
 
 |              | C-1 | C-5 | iNaturalist | OpenImages  |
 |--------------|--------|------------|------------|------|
 | ood_det_cov_   |   **0.681** |      **0.894** |   0.932 |   0.912 |
-| ood_det_sem_   |   0.662 |   0.879 |   **0.977** |   **0.941** |
-
-Please note that results may differ depending on the [CUDA](https://developer.nvidia.com/cuda-toolkit) version, the results above are computed for CUDA 12.2.
-
-Note: Currently we provide only robust classification evaluation of FT-Dinosaur [REF] masks on ImageNet-D dataset [REF].
-Results for other datasets or segmentation models as well as results for segmentation experiments and OOD detection experiments are currently not supported because of the unexpected shutdown of Galvani computing cluster in ML Cloud of University of Tübingen on 10.03.2025. We can provide commands to reproduce other results by request once the cluster is back online. The biggest part of the necessary code for that is already in this repository we just need to slightly adapt and test it.
-
+| ood_det_sem_   |   0.662 |   0.879 |   **0.977** |   **0.941** | -->
 
 ## Note about stuned.run_from_csv.py and .csv files
 
@@ -191,3 +221,22 @@ Whenever a script from some row successfully completes the corresponding value i
 Immediately after the .csv file submission for the rows that are being run a "status" column will be created (if it does not exist) with the value `Submitted` in it. Once corresponding sripts start running the "status" value will change to `Running`. Once the script completes status will become `Complete`. If the script fails its status will be `Fail`.
 
 If something does not allow the script to start the status can be stuck with `Submitted` value. In that case please check the submission log file which is by default in `tmp/tmp_log_for_run_from_csv.out`.
+
+## Bibtex
+
+```
+@misc{rubinstein2025objectcentriclearning,
+      title={Are We Done with Object-Centric Learning?},
+      author={
+        Alexander Rubinstein and
+        Ameya Prabhu and
+        Matthias Bethge and
+        Seong Joon Oh
+      },
+      year={2025},
+      eprint={2504.07092},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2504.07092},
+}
+```

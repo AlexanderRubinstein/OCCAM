@@ -37,7 +37,7 @@ def get_parser():
     )
     parser.add_argument(
         "--csv_with_results",
-        default="./sheets/robust_classification.csv",
+        default="./sheets/robust_classification_filled.csv",
         help="csv with all results",
     )
     parser.add_argument(

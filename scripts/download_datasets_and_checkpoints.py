@@ -2,6 +2,7 @@ import os
 import sys
 import shutil
 from tqdm import tqdm
+import argparse
 
 
 # local imports
@@ -48,47 +49,48 @@ OOD_RESULTS_URL = (
 BBOXES_URL = "https://drive.google.com/uc?id=1mcH4bximxJ0cEz44PhgNarwlrLMr0_6A"
 
 
-def download_datasets(datasets_folder):
+def download_datasets(datasets_folder, ignore_image_net_val):
     # UrbanCars, Waterbirds, CounterAnimals
-    if not os.path.exists(os.path.join(DATASETS_FOLDER, "UrbanCars")):
+    if not os.path.exists(os.path.join(datasets_folder, "UrbanCars")):
         assert not os.path.exists(
-            os.path.join(DATASETS_FOLDER, "Waterbirds")
+            os.path.join(datasets_folder, "Waterbirds")
         ), "Waterbirds already exists while UrbanCars is missing, please delete Waterbirds and try again"
         assert not os.path.exists(
-            os.path.join(DATASETS_FOLDER, "CounterAnimals")
+            os.path.join(datasets_folder, "CounterAnimals")
         ), "CounterAnimals already exists while UrbanCars is missing, please delete CounterAnimals and try again"
         print("Downloading UrbanCars, Waterbirds, CounterAnimals")
         download_and_extract_tar(DATA_PATH, UC_WB_CA_URL, extension=".tar")
 
-    # ImageNet validation
-    imagenet_val_folder = os.path.join(DATASETS_FOLDER, "ImageNet-val")
-    if not os.path.exists(os.path.join(imagenet_val_folder)):
-        raise ValueError(
-            f"ImageNet-val folder does not exist in {imagenet_val_folder}. "
-            f"Please manually download it from e.g. {IMAGENET_VAL_KAGGLE_URL}. "
-            f"If it is already downloaded, please make a symlink to it, "
-            f"e.g. `ln -s <path_to_imagenet_val_folder> {imagenet_val_folder}`."
-        )
+    if not ignore_image_net_val:
+        # ImageNet validation
+        imagenet_val_folder = os.path.join(datasets_folder, "ImageNet-val")
+        if not os.path.exists(os.path.join(imagenet_val_folder)):
+            raise ValueError(
+                f"ImageNet-val folder does not exist in {imagenet_val_folder}. "
+                f"Please manually download it from e.g. {IMAGENET_VAL_KAGGLE_URL}. "
+                f"If it is already downloaded, please make a symlink to it, "
+                f"e.g. `ln -s <path_to_imagenet_val_folder> {imagenet_val_folder}`."
+            )
 
     # ImageNet-D
-    imagenet_d_folder = os.path.join(DATASETS_FOLDER, "ImageNet-D")
+    imagenet_d_folder = os.path.join(datasets_folder, "ImageNet-D")
     if not os.path.exists(os.path.join(imagenet_d_folder, "background")):
         print("Downloading ImageNet-D")
         download_and_extract_tar(
-            DATASETS_FOLDER, IMAGENET_D_URL, extension=".tar"
+            datasets_folder, IMAGENET_D_URL, extension=".tar"
         )
         for subset in ["material", "questions", "texture"]:
             remove_file_or_folder(os.path.join(imagenet_d_folder, subset))
 
     # ImageNet-9 - 4.83GB
-    imagenet_9_folder = os.path.join(DATASETS_FOLDER, "ImageNet-9")
+    imagenet_9_folder = os.path.join(datasets_folder, "ImageNet-9")
     if not os.path.exists(os.path.join(imagenet_9_folder, "mixed_rand")):
         print("Downloading ImageNet-9")
         download_and_extract_tar(
-            DATASETS_FOLDER, IMAGENET_9_URL, extension=".tar"
+            datasets_folder, IMAGENET_9_URL, extension=".tar"
         )
         shutil.move(
-            os.path.join(DATASETS_FOLDER, "bg_challenge"),
+            os.path.join(datasets_folder, "bg_challenge"),
             os.path.join(imagenet_9_folder),
         )
         for subset in tqdm(os.listdir(imagenet_9_folder)):
@@ -146,7 +148,11 @@ def download_checkpoints(checkpoints_folder):
 
 
 def main():
-    download_datasets(DATASETS_FOLDER)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--ignore_image_net_val", action="store_true")
+    args = parser.parse_args()
+
+    download_datasets(DATASETS_FOLDER, args.ignore_image_net_val)
     download_checkpoints(CHECKPOINTS_FOLDER)
 
 
