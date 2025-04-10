@@ -9,6 +9,7 @@ tmp
 slurm_outputs
 *.lock
 experiment_configs
+not_sync
 
 
 # Byte-compiled / optimized / DLL files

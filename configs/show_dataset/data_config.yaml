@@ -2,9 +2,7 @@ data:
   dataset_configs:
     bboxed_dataset_urban_cars:
 
-      # train_transform: copy@data/dataset_configs/bboxed_dataset_only_bbox/train_transform
       train_transform: null
-
       eval_transform:
           from_class-Normalize:
             class: torchvision.transforms.Normalize
@@ -27,70 +25,53 @@ data:
 
       csv_path: ./data/csvs/cropformer/source_urban_cars_by_mask_size+by_background+by_num_connected_components.parquet
       dataset_task: classification
-      label_converter: "./data/datasets/UrbanCars/label_converter.pt"
+      label_converter: "./jsons/uc_label_converter.pt"
       foreground_keyword: by_mask_size+by_background+by_num_connected_components
     bboxed_dataset_wb_group_3: # waterbird on water bg
 
-      # train_transform: copy@data/dataset_configs/bboxed_dataset_only_bbox/train_transform
       train_transform: null
-
       eval_transform: copy@data/dataset_configs/bboxed_dataset_urban_cars/eval_transform
-
       train_val_split: 0.0
-
-      # csv_path: ./data/csvs/cropformer/source_waterbirds_group_3_cropformer.parquet
-      # csv_path: ./data/csvs/cropformer/source_waterbirds_group_3_by_mask_size+by_border_touch+by_border_vs_area.parquet
-      # csv_path: ./data/csvs/cropformer/source_waterbirds_group_3_by_mask_size+by_border_touch+by_border_vs_area+by_num_connected_components.parquet
-      # csv_path: ./data/csvs/cropformer/source_waterbirds_group_3_by_mask_size+by_border_vs_area+by_num_connected_components.parquet
-      # csv_path: /home/oh/arubinstein17/github/OCCAM/data/csvs/cropformer/source_waterbirds_group_3_by_mask_size+by_border_touch+by_border_vs_area+by_aspect_ratio.parquet
       csv_path: /home/oh/arubinstein17/github/OCCAM/data/csvs/cropformer/source_waterbirds_group_3_by_mask_size+by_background+by_num_connected_components.parquet
       dataset_task: classification
-      label_converter: "./data/datasets/Waterbirds/label_converter.pt"
+      label_converter: "./jsons/wb_label_converter.pt"
       foreground_keyword: null
-      # filter_keyword: by_mask_size+by_border_touch+by_border_vs_area+by_aspect_ratio+by_num_connected_components
       filter_keyword: by_mask_size+by_background+by_num_connected_components
+
     bboxed_dataset_wb_group_2: # waterbird on land bg
 
-      # train_transform: copy@data/dataset_configs/bboxed_dataset_only_bbox/train_transform
       train_transform: null
-
       eval_transform: copy@data/dataset_configs/bboxed_dataset_urban_cars/eval_transform
-
       train_val_split: 0.0
-
       csv_path: ./data/csvs/cropformer/source_waterbirds_group_2_by_mask_size+by_background+by_num_connected_components.parquet
-
       dataset_task: classification
-      label_converter: "./data/datasets/Waterbirds/label_converter.pt"
+      label_converter: "./jsons/wb_label_converter.pt"
       foreground_keyword: by_mask_size+by_background+by_num_connected_components
+
     bboxed_dataset_in_d:
+
       train_transform: null
-
       eval_transform: copy@data/dataset_configs/bboxed_dataset_urban_cars/eval_transform
-
       train_val_split: 0.0
       csv_path: ./data/csvs/cropformer/source_imagenet_d_bg_cropformer_by_mask_size+by_background+by_num_connected_components.parquet
       dataset_task: classification
-      label_converter: /home/oh/arubinstein17/github/OCCAM/data/datasets/ImageNet-D/id2category113.pt
-      # foreground_keyword: by_mask_size+by_border_touch+by_border_vs_area+by_aspect_ratio+by_num_connected_components
+      label_converter: ./jsons/in_d_label_converter.pt
       foreground_keyword: by_mask_size+by_background+by_num_connected_components
+
     bboxed_dataset_in_9:
+
       train_transform: null
-
       eval_transform: copy@data/dataset_configs/bboxed_dataset_urban_cars/eval_transform
-
       train_val_split: 0.0
       csv_path: ./data/csvs/cropformer/source_imagenet_9_mix_rand_cropformer_by_mask_size+by_background+by_num_connected_components.parquet
       dataset_task: classification
-      label_converter: ./data/datasets/ImageNet-9/in9_label_dict.pt
-      # foreground_keyword: by_mask_size+by_border_touch+by_border_vs_area+by_aspect_ratio+by_num_connected_components
+      label_converter: ./jsons/in_9_label_converter.pt
       foreground_keyword: by_mask_size+by_background+by_num_connected_components
 
     bboxed_dataset_counter:
+
       train_transform: null
-
       eval_transform: copy@data/dataset_configs/bboxed_dataset_urban_cars/eval_transform
-
       train_val_split: 0.0
       csv_path: ./data/csvs/cropformer/source_counter_animal_counter_by_mask_size+by_background+by_num_connected_components.parquet
       dataset_task: classification
