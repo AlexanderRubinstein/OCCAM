@@ -1,0 +1,15 @@
+params:
+  random_seed: 42
+is_python: True
+
+exec_path: <p>
+conda_env: ./envs/occam
+
+kwargs:
+  "filter_keyword": <p>
+
+
+logging:
+  gdrive_storage_folder: null
+  use_wandb: false
+

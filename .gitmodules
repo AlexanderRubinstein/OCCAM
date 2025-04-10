@@ -1,0 +1,9 @@
+[submodule "occam/submodules/alpha_clip"]
+	path = occam/submodules/alpha_clip
+	url = https://github.com/SunzeY/AlphaCLIP.git
+[submodule "occam/submodules/dino_ft"]
+	path = occam/submodules/dino_ft
+	url = https://github.com/rw-ocrl/ftdinosaur-inference.git
+[submodule "occam/submodules/oclf"]
+	path = occam/submodules/oclf
+	url = https://github.com/AlexanderRubinstein/object-centric-learning-framework.git

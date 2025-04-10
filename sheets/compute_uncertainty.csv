@@ -1,0 +1,2 @@
+path_to_main,path_to_default_config,whether_to_run,delta:exec_path,delta:kwargs/result_path,delta:kwargs/filter_keyword,delta:two_dash_flags
+__RUNNER__,./configs/uncertainty/runner_config_uncertainty.yaml,1,./scripts/compute_uncertainty_results.py,./data/results/uncertainty_scores/5clips_ensemble_with_filter.pkl,by_mask_size+by_background+by_num_connected_components,[clips]
