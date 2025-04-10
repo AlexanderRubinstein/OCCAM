@@ -1,11 +1,11 @@
-2025-04-06 13:15:01.656918 (error): 
+2025-04-06 13:15:01.656918 (error):
 
 2025-04-06 13:15:03.704112 (error):   0%|          | 0/2255 [00:00<?, ?it/s]
   3%|▎         | 73/2255 [00:00<00:02, 728.09it/s]
   8%|▊         | 180/2255 [00:00<00:02, 927.91it/s]
  13%|█▎        | 292/2255 [00:00<00:01, 1014.79it/s]
  17%|█▋        | 394/2255 [00:00<00:01, 1015.06it/s]
- 22%|██▏       | 496/2255 [00:00<00:01, 993.63it/s] 
+ 22%|██▏       | 496/2255 [00:00<00:01, 993.63it/s]
  26%|██▋       | 597/2255 [00:00<00:01, 997.35it/s]
  31%|███▏      | 707/2255 [00:00<00:01, 1028.88it/s]
  36%|███▌      | 816/2255 [00:00<00:01, 1047.30it/s]
@@ -1157,7 +1157,7 @@
  99%|█████████▉| 80/81 [02:59<00:02,  2.16s/it]
 100%|██████████| 81/81 [03:01<00:00,  1.91s/it]
 100%|██████████| 81/81 [03:02<00:00,  2.25s/it]
-/weka/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/site-packages/open_clip/factory.py:388: UserWarning: These pretrained weights were trained with QuickGELU activation but the model config does not have that enabled. Consider using a model config with a "-quickgelu" suffix or enable with a flag.
+./envs/occam/lib/python3.10/site-packages/open_clip/factory.py:388: UserWarning: These pretrained weights were trained with QuickGELU activation but the model config does not have that enabled. Consider using a model config with a "-quickgelu" suffix or enable with a flag.
 
 2025-04-06 13:27:55.399845 (error):   warnings.warn(
 
@@ -1265,13 +1265,13 @@
  52%|█████▏    | 1172/2255 [00:01<00:01, 983.27it/s]
  57%|█████▋    | 1278/2255 [00:01<00:00, 1004.66it/s]
  61%|██████▏   | 1385/2255 [00:01<00:00, 1023.79it/s]
- 66%|██████▌   | 1488/2255 [00:01<00:00, 990.85it/s] 
+ 66%|██████▌   | 1488/2255 [00:01<00:00, 990.85it/s]
  70%|███████   | 1588/2255 [00:01<00:00, 984.45it/s]
  75%|███████▌  | 1694/2255 [00:01<00:00, 1004.74it/s]
  80%|███████▉  | 1800/2255 [00:01<00:00, 1020.22it/s]
  85%|████████▍ | 1910/2255 [00:01<00:00, 1042.50it/s]
 
-2025-04-06 13:31:21.970288 (error):  89%|████████▉ | 2015/2255 [00:02<00:00, 968.60it/s] 
+2025-04-06 13:31:21.970288 (error):  89%|████████▉ | 2015/2255 [00:02<00:00, 968.60it/s]
  94%|█████████▍| 2115/2255 [00:02<00:00, 976.72it/s]
  98%|█████████▊| 2221/2255 [00:02<00:00, 998.56it/s]
 100%|██████████| 2255/2255 [00:02<00:00, 979.29it/s]
@@ -2465,7 +2465,7 @@
 
 2025-04-06 13:44:59.900736 (error): 100%|██████████| 85/85 [03:12<00:00,  2.05s/it]
 100%|██████████| 85/85 [03:12<00:00,  2.27s/it]
-/weka/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/site-packages/open_clip/factory.py:388: UserWarning: These pretrained weights were trained with QuickGELU activation but the model config does not have that enabled. Consider using a model config with a "-quickgelu" suffix or enable with a flag.
+./envs/occam/lib/python3.10/site-packages/open_clip/factory.py:388: UserWarning: These pretrained weights were trained with QuickGELU activation but the model config does not have that enabled. Consider using a model config with a "-quickgelu" suffix or enable with a flag.
   warnings.warn(
 
 
@@ -2569,7 +2569,7 @@
  59%|█████▉    | 379/642 [00:00<00:00, 945.49it/s]
  76%|███████▌  | 487/642 [00:00<00:00, 991.47it/s]
  92%|█████████▏| 593/642 [00:00<00:00, 1011.46it/s]
-100%|██████████| 642/642 [00:00<00:00, 972.73it/s] 
+100%|██████████| 642/642 [00:00<00:00, 972.73it/s]
 
 
 2025-04-06 13:48:34.668128 (error):   0%|          | 0/642 [00:00<?, ?it/s]
@@ -2587,7 +2587,7 @@
 
 2025-04-06 13:48:36.707129 (error):   0%|          | 0/3185 [00:00<?, ?it/s]
   3%|▎         | 104/3185 [00:00<00:02, 1031.41it/s]
-  7%|▋         | 208/3185 [00:00<00:03, 978.85it/s] 
+  7%|▋         | 208/3185 [00:00<00:03, 978.85it/s]
  10%|▉         | 307/3185 [00:00<00:02, 971.22it/s]
  13%|█▎        | 405/3185 [00:00<00:02, 972.34it/s]
  16%|█▌        | 503/3185 [00:00<00:02, 964.81it/s]
@@ -2927,7 +2927,7 @@
 2025-04-06 13:53:40.101860 (error):  96%|█████████▌| 22/23 [00:55<00:02,  2.15s/it]
 100%|██████████| 23/23 [00:56<00:00,  1.99s/it]
 100%|██████████| 23/23 [00:57<00:00,  2.51s/it]
-/weka/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/site-packages/open_clip/factory.py:388: UserWarning: These pretrained weights were trained with QuickGELU activation but the model config does not have that enabled. Consider using a model config with a "-quickgelu" suffix or enable with a flag.
+./envs/occam/lib/python3.10/site-packages/open_clip/factory.py:388: UserWarning: These pretrained weights were trained with QuickGELU activation but the model config does not have that enabled. Consider using a model config with a "-quickgelu" suffix or enable with a flag.
   warnings.warn(
 
 
@@ -2987,7 +2987,7 @@
   6%|▌         | 200/3204 [00:00<00:03, 999.37it/s]
   9%|▉         | 302/3204 [00:00<00:02, 1004.19it/s]
  13%|█▎        | 407/3204 [00:00<00:02, 1017.68it/s]
- 16%|█▌        | 509/3204 [00:00<00:02, 986.78it/s] 
+ 16%|█▌        | 509/3204 [00:00<00:02, 986.78it/s]
  19%|█▉        | 608/3204 [00:00<00:02, 981.81it/s]
  22%|██▏       | 707/3204 [00:00<00:02, 965.88it/s]
  25%|██▌       | 804/3204 [00:00<00:02, 957.09it/s]
@@ -3341,7 +3341,7 @@
  96%|█████████▌| 24/25 [00:59<00:02,  2.17s/it]
 100%|██████████| 25/25 [00:59<00:00,  1.58s/it]
 100%|██████████| 25/25 [01:00<00:00,  2.41s/it]
-/weka/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/site-packages/open_clip/factory.py:388: UserWarning: These pretrained weights were trained with QuickGELU activation but the model config does not have that enabled. Consider using a model config with a "-quickgelu" suffix or enable with a flag.
+./envs/occam/lib/python3.10/site-packages/open_clip/factory.py:388: UserWarning: These pretrained weights were trained with QuickGELU activation but the model config does not have that enabled. Consider using a model config with a "-quickgelu" suffix or enable with a flag.
   warnings.warn(
 
 

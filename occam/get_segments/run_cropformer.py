@@ -27,8 +27,6 @@ try:
         0, (os.path.dirname(os.path.dirname(__file__)))
     )  # to allow importing from get_segments directly
     from occam.get_segments.utils import add_maskformer2_config
-
-    # import occam.get_segments.cropformer_model
     from occam.get_segments.tardataset import TarDataset
     from occam.get_segments.utils import (
         BatchResizeShortestEdge,
@@ -84,12 +82,10 @@ try:
                 self.dataloader = None
             self.confidence_threshold = args.confidence_threshold
 
-        def preprocess(self, image):  # TODO(Alex | 13.11.2024): optimize it
+        def preprocess(self, image):
             assert image.shape[0] == 1
-            # image = image[0].to(torch.float32).cpu().numpy()
             image = image[0].cpu().numpy()
             image = np.asarray(image)
-            # Apply transforms to the input image.
             image = image[:, :, ::-1]
             height, width = image.shape[:2]
             aug_input_ori = T.AugInput(copy.deepcopy(image))
@@ -212,7 +208,11 @@ try:
             # requires compiling MultiScaleDeformableAttention CUDA op with the following commands:
             # cd <REPO_ROOT>/occam/get_segments/modeling/pixel_decoder/ops
             # sh make.sh
+            sys.path.insert(
+                0, (os.path.dirname(os.path.dirname(__file__)))
+            )  # to allow importing from get_segments directly
             import occam.get_segments.cropformer_model
+            sys.path.pop(0)
 
             self.entity_net = EntityNetV2(args=args, store_dataloader=False)
 
@@ -254,7 +254,14 @@ try:
             return mask_id
 
 except ImportError:
+
     class EntityNetV2:
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "detectron2 is not installed. Please install it using the following command: pip install 'git+https://github.com/facebookresearch/detectron2.git'"
+            )
+
+    class EntitySegDecoder:
         def __init__(self, *args, **kwargs):
             raise ImportError(
                 "detectron2 is not installed. Please install it using the following command: pip install 'git+https://github.com/facebookresearch/detectron2.git'"

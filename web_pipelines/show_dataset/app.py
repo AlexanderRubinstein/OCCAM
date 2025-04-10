@@ -314,7 +314,7 @@ def show_bbox_image(axes, item, label_converter=None, mode=None):
                 all_masks = np.concatenate([all_masks] * 3, axis=0)
             all_masks = (
                 all_masks / all_masks.max()
-            )  # TODO(Alex | 05.11.2024): allow for multicolor
+            )
             image_caption_list.append(
                 (tensor_for_matplotlib(all_masks), f"All masks")
             )
@@ -374,7 +374,7 @@ def show_bbox_image(axes, item, label_converter=None, mode=None):
                 all_masks = np.concatenate([all_masks] * 3, axis=0)
             all_masks = (
                 all_masks / all_masks.max()
-            )  # TODO(Alex | 05.11.2024): allow for multicolor
+            )
             image_caption_list.append(
                 (tensor_for_matplotlib(all_masks), f"All masks")
             )

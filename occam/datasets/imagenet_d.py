@@ -1,20 +1,9 @@
 import json
 import torch
-import h5py
 import os
 import sys
-
-# import torch
-import numpy as np
-import random
-import torchvision
-from datasets import load_dataset
 import PIL
 from stuned.utility.utils import (
-    # show_images,
-    # load_from_pickle,
-    # append_dict,
-    # get_project_root_path,
     get_with_assert,
     read_json,
 )
@@ -34,10 +23,6 @@ sys.path.pop(0)
 
 
 IMAGENET_D_SUBSETS = ["background", "texture", "material"]
-# JSON_PATH = os.path.join(
-#     get_project_root_path(),
-#     "json"
-# )
 IMAGENET_D_ID_MAP_JSON = os.path.join(JSON_PATH, "imgnet_d2imgnet_id.json")
 IN_D_PATH = os.path.join(DATASETS_PATH, "ImageNet-D")
 
@@ -111,27 +96,8 @@ class ImageNetDLoader(torch.utils.data.Dataset):
         return {"images": img_tensor, "labels": labels, "path": path_list}
 
 
-# def get_collate_fn_in_d(drop_paths):
-#     def collate_fn_in_d(examples):
-#         images = []
-#         labels = []
-#         paths = []
-#         for example in examples:
-#             images.append(example["images"])
-#             # we take only first label as we are not interested in top-5 accuracy
-#             labels.append(torch.tensor(example["labels"][0], dtype=torch.long))
-#             paths.append(example["path"])
-#         if drop_paths:
-#             return torch.stack(images), torch.stack(labels)
-#         else:
-#             return torch.stack(images), torch.stack(labels), paths
-
-#     return collate_fn_in_d
-
-
 def get_in_d_category_list():
-    # with open(os.path.join(get_project_root_path(), 'json', 'imgnet_d_dir2imgnet_d_id.json')) as f:
-    #     category_mapping = json.load(f)
+
     category_mapping = read_json(
         os.path.join(JSON_PATH, "imgnet_d_dir2imgnet_d_id.json")
     )
@@ -158,45 +124,26 @@ def convert_folder_name_to_category_name(folder_name):
 
 def make_path2label_in_d(
     dataset_path, to_map_labels=True
-):  # for counter animal
-    # dataset_path = "/home/oh/arubinstein17/github/densification/data/CounterAnimal/symlinked/counter"
+):
     transform = None
-    return_path = True
-    masks = None
-    mask_transform = None
 
-    # dataset = CustomImageFolder(
-    #     dataset_path,
-    #     transform=transform,
-    #     return_path=return_path,
-    #     masks=masks,
-    #     mask_transform=mask_transform
-    # )
     dataset = ImageNetDLoader(
         test_base_dir=dataset_path,
         transform=transform,
         to_map_labels=to_map_labels,
     )
 
-    # res = []
-    # for item in tqdm(dataset):
-    #     res.append([item[2], item[1]])
-    # return res
-    # return dataset.samples
-
     # label_lists is of form: [909, -1, -1, -1, -1, -1, -1, -1, -1, -1], so we take only first element
     return list(zip(dataset.file_lists, [el[0] for el in dataset.label_lists]))
 
 
 def get_imagenet_d_dataloaders(
-    # train_batch_size,
     eval_batch_size,
     dataset_config,
     num_workers,
     eval_transform,
     to_map_labels=True,
     shuffle=False
-    # logger
 ):
     data_dir = get_with_assert(dataset_config, "data_dir")
     ind_types = dataset_config.get("ind_types")
@@ -224,22 +171,15 @@ def get_imagenet_d_dataloaders(
 def make_mapping_dict_imagenet_d(
     images_folder, masks_path, bboxes_path, separate_masks_folder
 ):
-    # path2label = make_path2label_imagenet_d(images_folder)
-    # path2label = make_path2label_counter_animal(images_folder)
     dataset_kwargs = {}
     if isinstance(images_folder, (list, tuple)):
         images_folder, dataset_kwargs = images_folder
     path2label = make_path2label_in_d(images_folder, **dataset_kwargs)
-    # path2label_counter = make_path2label_counter_animal("/home/oh/arubinstein17/github/densification/data/CounterAnimal/symlinked/counter_mislabeled_siglip")
 
-    # mapping_dict_counter = make_mapping_dict(
-
-    # TODO(Alex | 03.12.2024): rename func to more generic as it is not counter_animal specific
     mapping_dict = make_mapping_dict_from_folder(
         path2label=path2label,
         masks_path=masks_path,
         bboxes_path=bboxes_path,
         separate_masks_folder=separate_masks_folder,
-        # assert_shape=True
     )
     return mapping_dict

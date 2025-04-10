@@ -1,4 +1,4 @@
-2025-04-06 17:39:54.450443 (error): 
+2025-04-06 17:39:54.450443 (error):
 
 2025-04-06 17:39:55.258603 (error):   0%|          | 0/1000 [00:00<?, ?it/s]
  12%|█▏        | 121/1000 [00:00<00:00, 1208.88it/s]
@@ -913,7 +913,7 @@
  99%|█████████▊| 67/68 [02:29<00:02,  2.16s/it]
 100%|██████████| 68/68 [02:30<00:00,  1.81s/it]
 100%|██████████| 68/68 [02:31<00:00,  2.22s/it]
-/weka/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/site-packages/open_clip/factory.py:388: UserWarning: These pretrained weights were trained with QuickGELU activation but the model config does not have that enabled. Consider using a model config with a "-quickgelu" suffix or enable with a flag.
+./envs/occam/lib/python3.10/site-packages/open_clip/factory.py:388: UserWarning: These pretrained weights were trained with QuickGELU activation but the model config does not have that enabled. Consider using a model config with a "-quickgelu" suffix or enable with a flag.
   warnings.warn(
 
 
@@ -992,7 +992,7 @@
 100%|██████████| 68/68 [02:45<00:00,  2.43s/it]
 
 
-2025-04-06 17:52:58.710450 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:52:58.710450 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1006,7 +1006,7 @@
 100%|██████████| 8/8 [00:02<00:00,  3.58it/s]
 
 
-2025-04-06 17:53:03.687515 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:53:03.687515 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1020,7 +1020,7 @@
 100%|██████████| 8/8 [00:02<00:00,  3.65it/s]
 
 
-2025-04-06 17:53:08.648597 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:53:08.648597 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1045,7 +1045,7 @@
 100%|██████████| 8/8 [00:01<00:00,  5.00it/s]
 
 
-2025-04-06 17:53:19.617407 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:53:19.617407 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1060,7 +1060,7 @@
 100%|██████████| 8/8 [00:02<00:00,  3.32it/s]
 
 
-2025-04-06 17:53:24.689632 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:53:24.689632 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1075,7 +1075,7 @@
 100%|██████████| 8/8 [00:02<00:00,  3.33it/s]
 
 
-2025-04-06 17:53:29.688364 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:53:29.688364 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1102,7 +1102,7 @@
 100%|██████████| 8/8 [00:01<00:00,  4.13it/s]
 
 
-2025-04-06 17:53:38.321200 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:53:38.321200 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1113,7 +1113,7 @@
 100%|██████████| 8/8 [00:02<00:00,  3.85it/s]
 
 
-2025-04-06 17:53:42.820591 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:53:42.820591 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1124,7 +1124,7 @@
 100%|██████████| 8/8 [00:02<00:00,  3.81it/s]
 
 
-2025-04-06 17:53:47.368200 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:53:47.368200 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1142,7 +1142,7 @@
 100%|██████████| 8/8 [00:01<00:00,  6.17it/s]
 
 
-2025-04-06 17:53:56.248988 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:53:56.248988 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1152,7 +1152,7 @@
 100%|██████████| 8/8 [00:02<00:00,  3.78it/s]
 
 
-2025-04-06 17:54:01.693343 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:54:01.693343 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1162,7 +1162,7 @@
 100%|██████████| 8/8 [00:02<00:00,  3.64it/s]
 
 
-2025-04-06 17:54:06.631443 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:54:06.631443 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1179,7 +1179,7 @@
 100%|██████████| 8/8 [00:01<00:00,  6.51it/s]
 
 
-2025-04-06 17:54:14.701944 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:54:14.701944 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1190,7 +1190,7 @@
 100%|██████████| 8/8 [00:02<00:00,  3.95it/s]
 
 
-2025-04-06 17:54:19.748778 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:54:19.748778 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1201,7 +1201,7 @@
 100%|██████████| 8/8 [00:01<00:00,  4.01it/s]
 
 
-2025-04-06 17:54:24.354832 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:54:24.354832 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1220,7 +1220,7 @@
 100%|██████████| 8/8 [00:01<00:00,  6.90it/s]
 
 
-2025-04-06 17:54:34.872494 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:54:34.872494 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1231,7 +1231,7 @@
 100%|██████████| 8/8 [00:01<00:00,  4.18it/s]
 
 
-2025-04-06 17:54:39.534488 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:54:39.534488 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1242,7 +1242,7 @@
 100%|██████████| 8/8 [00:01<00:00,  4.09it/s]
 
 
-2025-04-06 17:54:44.151598 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:54:44.151598 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1261,7 +1261,7 @@
 100%|██████████| 8/8 [00:01<00:00,  7.27it/s]
 
 
-2025-04-06 17:54:53.381869 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:54:53.381869 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1276,7 +1276,7 @@
 100%|██████████| 8/8 [00:03<00:00,  2.66it/s]
 
 
-2025-04-06 17:54:59.011280 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:54:59.011280 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1291,7 +1291,7 @@
 100%|██████████| 8/8 [00:03<00:00,  2.64it/s]
 
 
-2025-04-06 17:55:04.543333 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:55:04.543333 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1318,7 +1318,7 @@
 100%|██████████| 8/8 [00:02<00:00,  3.61it/s]
 
 
-2025-04-06 17:55:18.293014 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:55:18.293014 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1330,7 +1330,7 @@
 100%|██████████| 8/8 [00:02<00:00,  3.71it/s]
 
 
-2025-04-06 17:55:23.952280 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:55:23.952280 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1344,7 +1344,7 @@
 100%|██████████| 8/8 [00:02<00:00,  3.62it/s]
 
 
-2025-04-06 17:55:29.429196 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:55:29.429196 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1367,7 +1367,7 @@
 100%|██████████| 8/8 [00:01<00:00,  5.17it/s]
 
 
-2025-04-06 17:55:43.657319 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:55:43.657319 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1382,7 +1382,7 @@
 100%|██████████| 8/8 [00:03<00:00,  2.40it/s]
 
 
-2025-04-06 17:55:50.172500 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:55:50.172500 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1397,7 +1397,7 @@
 100%|██████████| 8/8 [00:03<00:00,  2.38it/s]
 
 
-2025-04-06 17:55:56.736257 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:55:56.736257 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1424,7 +1424,7 @@
 100%|██████████| 8/8 [00:03<00:00,  2.61it/s]
 
 
-2025-04-06 17:56:14.695686 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:56:14.695686 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1439,7 +1439,7 @@
 100%|██████████| 8/8 [00:02<00:00,  3.29it/s]
 
 
-2025-04-06 17:56:20.422441 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:56:20.422441 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1454,7 +1454,7 @@
 100%|██████████| 8/8 [00:02<00:00,  3.14it/s]
 
 
-2025-04-06 17:56:27.443970 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:56:27.443970 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1481,7 +1481,7 @@
 100%|██████████| 8/8 [00:02<00:00,  3.81it/s]
 
 
-2025-04-06 17:56:46.530044 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:56:46.530044 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1496,7 +1496,7 @@
 100%|██████████| 8/8 [00:04<00:00,  1.84it/s]
 
 
-2025-04-06 17:56:53.862714 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:56:53.862714 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1511,7 +1511,7 @@
 100%|██████████| 8/8 [00:04<00:00,  1.80it/s]
 
 
-2025-04-06 17:57:01.886836 (error):   0%|          | 0/8 [00:00<?, ?it/s]/home/oh/arubinstein17/github/OCCAM/occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+2025-04-06 17:57:01.886836 (error):   0%|          | 0/8 [00:00<?, ?it/s]./occam/robust_classification/eval.py:1185: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
   with torch.cuda.amp.autocast(enabled=enable_amp):
 
 
@@ -1538,49 +1538,49 @@
 100%|██████████| 8/8 [00:03<00:00,  2.15it/s]
 
 2025-04-06 17:57:25.371234 (error): Traceback (most recent call last):
-  File "/weka/oh/arubinstein17/github/STAI-tuned/src/stuned/utility/utils.py", line 1316, in wrapped_func
+  File "~/github/STAI-tuned/src/stuned/utility/utils.py", line 1316, in wrapped_func
     return func(*args, **kwargs)
-  File "/weka/oh/arubinstein17/github/STAI-tuned/src/stuned/utility/logger.py", line 1646, in sync_local_file_with_gdrive
+  File "~/github/STAI-tuned/src/stuned/utility/logger.py", line 1646, in sync_local_file_with_gdrive
     remote_file.Upload()
-  File "/home/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/site-packages/pydrive2/files.py", line 510, in Upload
+  File "./envs/occam/lib/python3.10/site-packages/pydrive2/files.py", line 510, in Upload
     self._FilesUpdate(param=param)
-  File "/home/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/site-packages/pydrive2/auth.py", line 85, in _decorated
+  File "./envs/occam/lib/python3.10/site-packages/pydrive2/auth.py", line 85, in _decorated
     return decoratee(self, *args, **kwargs)
-  File "/home/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/site-packages/pydrive2/files.py", line 827, in _FilesUpdate
+  File "./envs/occam/lib/python3.10/site-packages/pydrive2/files.py", line 827, in _FilesUpdate
     self.auth.service.files()
-  File "/home/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/site-packages/googleapiclient/_helpers.py", line 130, in positional_wrapper
+  File "./envs/occam/lib/python3.10/site-packages/googleapiclient/_helpers.py", line 130, in positional_wrapper
     return wrapped(*args, **kwargs)
-  File "/home/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/site-packages/googleapiclient/http.py", line 902, in execute
+  File "./envs/occam/lib/python3.10/site-packages/googleapiclient/http.py", line 902, in execute
     _, body = self.next_chunk(http=http, num_retries=num_retries)
-  File "/home/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/site-packages/googleapiclient/_helpers.py", line 130, in positional_wrapper
+  File "./envs/occam/lib/python3.10/site-packages/googleapiclient/_helpers.py", line 130, in positional_wrapper
     return wrapped(*args, **kwargs)
-  File "/home/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/site-packages/googleapiclient/http.py", line 1007, in next_chunk
+  File "./envs/occam/lib/python3.10/site-packages/googleapiclient/http.py", line 1007, in next_chunk
     resp, content = _retry_request(
-  File "/home/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/site-packages/googleapiclient/http.py", line 222, in _retry_request
+  File "./envs/occam/lib/python3.10/site-packages/googleapiclient/http.py", line 222, in _retry_request
     raise exception
-  File "/home/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/site-packages/googleapiclient/http.py", line 191, in _retry_request
+  File "./envs/occam/lib/python3.10/site-packages/googleapiclient/http.py", line 191, in _retry_request
     resp, content = http.request(uri, method, *args, **kwargs)
-  File "/home/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/site-packages/oauth2client/transport.py", line 173, in new_request
+  File "./envs/occam/lib/python3.10/site-packages/oauth2client/transport.py", line 173, in new_request
     resp, content = request(orig_request_method, uri, method, body,
-  File "/home/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/site-packages/oauth2client/transport.py", line 280, in request
+  File "./envs/occam/lib/python3.10/site-packages/oauth2client/transport.py", line 280, in request
     return http_callable(uri, method=method, body=body, headers=headers,
-  File "/home/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/site-packages/httplib2/__init__.py", line 1724, in request
+  File "./envs/occam/lib/python3.10/site-packages/httplib2/__init__.py", line 1724, in request
     (response, content) = self._request(
-  File "/home/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/site-packages/httplib2/__init__.py", line 1444, in _request
+  File "./envs/occam/lib/python3.10/site-packages/httplib2/__init__.py", line 1444, in _request
     (response, content) = self._conn_request(conn, request_uri, method, body, headers)
-  File "/home/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/site-packages/httplib2/__init__.py", line 1396, in _conn_request
+  File "./envs/occam/lib/python3.10/site-packages/httplib2/__init__.py", line 1396, in _conn_request
     response = conn.getresponse()
-  File "/home/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/http/client.py", line 1368, in getresponse
+  File "./envs/occam/lib/python3.10/http/client.py", line 1368, in getresponse
     response.begin()
-  File "/home/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/http/client.py", line 317, in begin
+  File "./envs/occam/lib/python3.10/http/client.py", line 317, in begin
     version, status, reason = self._read_status()
-  File "/home/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/http/client.py", line 278, in _read_status
+  File "./envs/occam/lib/python3.10/http/client.py", line 278, in _read_status
     line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
-  File "/home/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/socket.py", line 705, in readinto
+  File "./envs/occam/lib/python3.10/socket.py", line 705, in readinto
     return self._sock.recv_into(b)
-  File "/home/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/ssl.py", line 1273, in recv_into
+  File "./envs/occam/lib/python3.10/ssl.py", line 1273, in recv_into
     return self.read(nbytes, buffer)
-  File "/home/oh/arubinstein17/github/OCCAM/envs/occam/lib/python3.10/ssl.py", line 1129, in read
+  File "./envs/occam/lib/python3.10/ssl.py", line 1129, in read
     return self._sslobj.read(len, buffer)
 ssl.SSLError: [SSL: DECRYPTION_FAILED_OR_BAD_RECORD_MAC] decryption failed or bad record mac (_ssl.c:2536)
 

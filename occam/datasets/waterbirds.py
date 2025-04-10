@@ -1,30 +1,11 @@
-# import json
-# import torch
-# import h5py
 import os
 import sys
-
-# import torch
-# import numpy as np
-# import random
-# import torchvision
-# from datasets import load_dataset
-# import PIL
-# from stuned.utility.utils import (
-#     show_images,
-#     load_from_pickle,
-#     append_dict,
-#     get_project_root_path,
-#     get_with_assert
-# )
 
 
 sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src")
 )
 from occam.datasets.utils import (
-    # JSON_PATH,
-    # get_collate_fn_in_d,
     make_custom_folder_path2label,
     make_mapping_dict_generic,
 )
@@ -276,11 +257,6 @@ WATER_BIRDS_LIST = [
     "ivory gull",
     "least tern",
 ]
-
-
-ALL_BIRDS_LIST_PATH = (
-    "/mnt/lustre/work/oh/arubinstein17/cache/Waterbirds/all_birds.pt"
-)
 
 
 def make_path2label_waterbirds(dataset_path):

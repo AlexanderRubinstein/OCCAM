@@ -32,7 +32,7 @@ TAR_FOLDER = os.path.join(get_project_root_path(), "data", "tars")
 
 
 def get_parser():
-    parser = argparse.ArgumentParser(description="Predict masks with Dino-FT")
+    parser = argparse.ArgumentParser(description="Predict masks with mask generators")
     parser.add_argument("--model_id", help="Dino-FT model id")
     parser.add_argument("--model_path", help="Cropformer checkpoint path")
     parser.add_argument("--input_folder", help="Input folder")
@@ -70,20 +70,10 @@ def should_be_provided(arg, arg_name, mask_generator_type):
     ), f"{arg_name} should be provided for {mask_generator_type}"
 
 
-def pop_arg_from_opts(args, arg_name):
-    cutoff_i = None
-    output = None
-    for i in range(len(args.opts)):
-        if args.opts[i] == arg_name:
-            output = args.opts[i + 1]
-            cutoff_i = i
-            break
-    assert cutoff_i is not None
-    args.opts = args.opts[:cutoff_i] + args.opts[cutoff_i + 2 :]
-    return output
-
-
 if __name__ == "__main__":
+    """
+    predict masks with Dino-FT or CropFormer
+    """
     args = get_parser().parse_args()
 
     optionally_make_dir(args.output)
@@ -144,8 +134,6 @@ if __name__ == "__main__":
         assert (
             args.confidence_threshold is None
         ), "confidence_threshold is not implemented for dino-ft"
-
-        # assert len(args.opts) == 0, "opts should be empty for dino-ft"
 
         model = load_model(args.model_id)
         preproc = build_dinosaur.build_preprocessing(args.model_id)

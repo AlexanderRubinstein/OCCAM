@@ -2,10 +2,6 @@ import os
 import sys
 import argparse
 import torch
-
-# import torchvision
-# import types
-# import timm
 import pandas as pd
 
 
@@ -20,7 +16,6 @@ from occam.robust_classification.models import (
     add_openai_clip_model,
     add_alpha_clip_model,
     add_openclip_model,
-    # make_clip_ensemble,
     get_clip_ensemble_builder,
 )
 from occam.datasets.imagenet_d import (
@@ -36,11 +31,9 @@ from occam.datasets.urban_cars import URBAN_CARS_PATH, get_clip_uc_category_list
 from occam.datasets.counter_animal import (
     COUNTER_PATH,
     COMMON_PATH,
-    # make_counter_animal_categories
 )
 from occam.datasets.imagenet_9 import (
     IMAGENET_9_PATH,
-    # get_in_9_category_list
 )
 from occam.datasets.utils import (
     DATA_PATH,
@@ -52,12 +45,7 @@ sys.path.pop(0)
 
 
 from stuned.utility.utils import (
-    # show_images,
-    # load_from_pickle,
-    # append_dict,
-    get_project_root_path,
     raise_unknown,
-    # get_with_assert
 )
 
 
@@ -71,7 +59,7 @@ def get_parser():
     )
     parser.add_argument(
         "--result_path",
-        default="/home/oh/arubinstein17/github/densification/data/results/for_runner_eval_uc.pth",
+        default="./data/results/robust_classification/for_runner_eval.pth",
         help="where to save the results",
     )
     parser.add_argument(
@@ -105,6 +93,13 @@ def get_parser():
 
 
 def add_clip_models(models_dict, category_list, dataset_name, siglip=False):
+    """
+    add clip models to the models dict
+    models_dict: dict of models
+    category_list: list of categories used for CLIP models
+    dataset_name: name of the dataset
+    siglip: bool, if True, add siglip models
+    """
     if dataset_name == "counter_animal_gap":
         add_openai_clip_model("RN50", category_list, models_dict)
         add_openai_clip_model("RN101", category_list, models_dict)
@@ -167,12 +162,6 @@ def add_clip_models(models_dict, category_list, dataset_name, siglip=False):
             models_dict=models_dict,
             pretrained="datacomp_s34b_b86k",
         )
-        # add_openclip_model(
-        #     model_id='ViT-B-32',
-        #     category_list=category_list,
-        #     models_dict=models_dict,
-        #     pretrained='dfn2b'
-        # )
 
         # 'ViT-L-14'
         add_openclip_model(
@@ -252,45 +241,7 @@ def add_clip_models(models_dict, category_list, dataset_name, siglip=False):
         add_openai_clip_model("ViT-L/14", category_list, models_dict)
         add_alpha_clip_model("ViT-L/14", category_list, models_dict)
         add_openai_clip_model("RN50", category_list, models_dict)
-        # print("DEBUG: Uncomment 2 above pls")
     if siglip:
-        # add_openclip_model(
-        #     model_id="ViT-SO400M-14-SigLIP-384",
-        #     category_list=category_list,
-        #     models_dict=models_dict,
-        #     pretrained="webli",
-        # )
-        # add_openclip_model(
-        #     model_id='nllb-clip-base-siglip',
-        #     category_list=category_list,
-        #     models_dict=models_dict,
-        #     pretrained='v1'
-        # )
-        # add_openclip_model(
-        #     model_id='nllb-clip-base-siglip',
-        #     category_list=category_list,
-        #     models_dict=models_dict,
-        #     pretrained='mrl'
-        # )
-        # add_openclip_model(
-        #     model_id='nllb-clip-large-siglip',
-        #     category_list=category_list,
-        #     models_dict=models_dict,
-        #     pretrained='v1'
-        # )
-        # add_openclip_model(
-        #     model_id='nllb-clip-large-siglip',
-        #     category_list=category_list,
-        #     models_dict=models_dict,
-        #     pretrained='mrl'
-        # )
-        # add_openclip_model(
-        #     model_id='ViT-bigG-14',
-        #     category_list=category_list,
-        #     models_dict=models_dict,
-        #     pretrained='laion2b_s39b_b160k'
-        # )
-
         add_openclip_model(
             model_id="ViT-B-16-SigLIP",
             category_list=category_list,
@@ -342,6 +293,9 @@ def add_clip_models(models_dict, category_list, dataset_name, siglip=False):
 
 
 def main():
+    """
+    add background scores and eval on spurious backgrounds datasets
+    """
     args = get_parser().parse_args()
 
     _models_dict = {}
@@ -356,7 +310,6 @@ def main():
 
     batch_size = args.batch_size
 
-    # data_path = os.path.join(get_project_root_path(), "data")
     data_path = DATA_PATH
 
     parquets_base_dir = CSV_PATH
@@ -390,11 +343,6 @@ def main():
             _parquet_kwargs["mapper"] = "urban_cars_clip"
         else:
             raise NotImplementedError("This function was not tested yet")
-            # add_lle_model(
-            #     arch='resnet50',
-            #     models_dict=_models_dict,
-            #     ckpt_fpath="/home/oh/arubinstein17/github/Whac-A-Mole/exp/urbancars/lle_es_both_urbancars/seed_0/best.pth"
-            # )
 
         parquets = {}
 
@@ -436,9 +384,8 @@ def main():
         )
         _images_path = os.path.join(DATASETS_PATH, "ImageNet-val")
         _masks_path = os.path.join(
-            masks_base_dir, args.mask_source, f"in_val_masks_v2.pkl"
+            masks_base_dir, args.mask_source, f"in_val_masks.pkl"
         )
-        print("DEBUG: Remove v2 above")
         _bboxes_path = os.path.join(data_path, "bboxes_annotations", "val")
         _masks_path = (_masks_path, _bboxes_path)
         split_images_masks.append(
@@ -465,8 +412,6 @@ def main():
         )
         if args.clip:
             _category_list = get_in_classes_prompts()
-            # _category_list = make_counter_animal_categories() # should we use this or original IN-classes?
-            # _parquet_kwargs["mapper"] = "counter_animal_clip" # comment this out when use original IN-classes
 
         else:
             raise NotImplementedError()
@@ -500,9 +445,6 @@ def main():
             raise NotImplementedError()
 
         for group_id in range(len(WATERBIRDS_PATHS)):
-            # if group_id != 3 and group_id != 2:
-            # continue
-            # print(f"DEBUG: Uncomment above to run for group {group_id}")
             parquet_name = f"waterbirds_group_{group_id}"
             parquets[parquet_name] = (
                 os.path.join(
@@ -536,14 +478,12 @@ def main():
             _category_list = get_in_classes_prompts()
             _parquet_kwargs["mapper"] = "in9"
             clean_dataloader_kwargs["clean_type"] = parquet_name
-            # clean_dataloader_kwargs |= _parquet_kwargs
         else:
             raise NotImplementedError()
 
         split_images_masks.append(
             (
                 parquet_name,
-                # os.path.join(CACHE_PATH, "background_challenge", "bg_challenge", "mixed_rand", "val"),
                 IMAGENET_9_PATH,
                 os.path.join(
                     masks_base_dir,
@@ -623,15 +563,9 @@ def main():
 
     if args.ens_entropy:
         assert args.clip
-        # clip_ensemble = make_clip_ensemble(_category_list)
-        # _models_dict["clip_ensemble"] = (
-        #     clip_ensemble,
-        #     clip_ensemble.preprocess,
-        # )
         _models_dict["clip_ensemble"] = ModelBuilder(
             get_clip_ensemble_builder(_category_list)
         )
-        # raise NotImplementedError("Do we return preprocess as second arg for others?")
 
     for (
         split,
@@ -693,6 +627,11 @@ def main():
 
 
 def convert_to_table(result_path, dataset_name):
+    """
+    convert the results dict to a table
+    result_path: path to the results dict
+    dataset_name: name of the dataset
+    """
     res_dict = torch.load(result_path)
 
     sort_by = None

@@ -50,6 +50,11 @@ BBOXES_URL = "https://drive.google.com/uc?id=1mcH4bximxJ0cEz44PhgNarwlrLMr0_6A"
 
 
 def download_datasets(datasets_folder, ignore_image_net_val):
+    """
+    download datasets
+    datasets_folder: path to the datasets folder
+    ignore_image_net_val: if True, ignore ImageNet-val
+    """
     # UrbanCars, Waterbirds, CounterAnimals
     if not os.path.exists(os.path.join(datasets_folder, "UrbanCars")):
         assert not os.path.exists(
@@ -110,6 +115,10 @@ def download_datasets(datasets_folder, ignore_image_net_val):
 
 
 def download_checkpoints(checkpoints_folder):
+    """
+    download checkpoints
+    checkpoints_folder: path to the checkpoints folder
+    """
     optionally_make_dir(checkpoints_folder, call_dirname=False)
 
     # Cropformer
@@ -148,6 +157,9 @@ def download_checkpoints(checkpoints_folder):
 
 
 def main():
+    """
+    download datasets and checkpoints
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--ignore_image_net_val", action="store_true")
     args = parser.parse_args()

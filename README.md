@@ -25,7 +25,7 @@ mkdir ./envs && conda create --yes --prefix ./envs/occam python==3.10.0
 conda activate ./envs/occam/
 pip install -r requirements.txt
 
-# the commands below are needed only if mask generation with HQES is planned.
+# the commands below are needed only if you plan to generate masks with HQES.
 # They require GCC 9+ for building detectron2
 # as well as relevant `CUDA_HOME`, `LD_LIBRARY_PATH`, `CPATH`, `CFLAGS`,
 # and `LDFLAGS` environment variables for compiling CUDA kernel
@@ -63,15 +63,17 @@ from the following sections (order matters):
 ["Generate masks"](#generate-masks),
 ["Evaluate robust classification"](#evaluate-robust-classification)
 
-To plot the ROC-curves for OOD detection, please run all cells in sections `Imports`, `Functions` and `CLIP confidences` of jupyter notebook `./notebooks/ood_det.ipynb`. It makes this plot by using precomputed Class-Aided, IoU and uncertainty scores stored in `data/results/ood_detection` and `data/results/uncertainty_scores`.
+To plot the ROC-curves for OOD detection, please run all cells in sections `Imports`, `Functions` and `CLIP confidences` (order matters) of jupyter notebook `./notebooks/ood_det.ipynb`. It makes this plot by using precomputed Class-Aided, IoU and uncertainty scores stored in `data/results/ood_detection` and `data/results/uncertainty_scores`.
 
 If you want to regenerate those scores, you will need to follow the same instructions
 for robust classification results + instructions from ["Compute uncertainty scores"](#compute-uncertainty-scores) (order matters).
 
+To get the qualitative results for HQES from Figure 1 (segmentation of image with bears) or Figure 3 please run all cells in sections `Imports`, `Functions`, `Predict with HQES` (order matters) in jupyter notebook `./notebooks/qualitative_results.ipynb.
+
 Please note that results may differ depending on the [CUDA](https://developer.nvidia.com/cuda-toolkit) version, the results above are computed for CUDA 12.2.
 
 Note: Currently we provide only robust classification results.
-Results for segmentation experiments are currently not supported because they were computed using the [fork](https://github.com/AlexanderRubinstein/object-centric-learning-framework) of the separate repository. We can add code and commands to reproduce other results by request if there are enough people interested.
+Quantitative results for the object discovery (segmentation) experiments are currently not supported because they were computed using the [fork](https://github.com/AlexanderRubinstein/object-centric-learning-framework) of the separate repository. We can add code and commands to reproduce other results by request if there are enough people interested.
 
 ## Download datasets and checkpoints
 
@@ -106,21 +108,6 @@ In addition to that `checkpoints` folder will also be created and will have the 
 ┗ 📜clip_l14_grit20m_fultune_2xe.pth
 ┗ 📜CropFormer_hornet_3x_03823a.pth
 ```
-
-  <!-- ┗ 📂cached
-    ┣ 📂Brightness_1
-    ┃ ┗ 📜4c905e75df34398dcc32_...50000_samples.hdf5
-    ┣ 📂Brightness_5
-    ┃ ┗ 📜ef1173603b558d0a45ac_...50000_samples.hdf5
-    ...
-    ┣ 📂Zoom Blur_5
-    ┃ ┗ 📜3f50303a2e87f30cba0c_torch_...50000_samples.hdf5
-    ┣ 📜in_a_deit3b_-1_.hdf5
-    ┣ 📜in_r_deit3b_-1_.hdf5
-    ┣ 📜in_train_deit3b_-1_4_epochs.hdf5
-    ┣ 📜in_val_deit3b_-1.hdf5
-    ┣ 📜inat_deit3b_-1_.hdf5
-    ┗ 📜oi_deit3b_-1_.hdf5 -->
 
 After following the steps from the section ["Generate masks"](#generate-masks) additional folders `masks` and `tars` will be created inside `data` folder, so that its resulting structure will be the following:
 
@@ -180,15 +167,6 @@ export ROOT=./ && export ENV=$ROOT/envs/occam && export PROJECT_ROOT_PROVIDED_FO
 
 Upon a successful scripts completion `sheets/compute_uncertainty.csv` will look like `sheets/compute_uncertainty_filled.csv` and will be ready for steps described in [Reproduce results from the paper](#reproduce-results-from-the-paper).
 
-<!-- The accuracies can be seen in the end of <run_folder>/stdout.txt file, where <run_folder> are the paths from `run_folder` column in `./sheets/robust_classification.csv` table.
-
-E.g. accuracy of OCCAM with FT-Dinosaur masks on ImageNet-D dataset that reproduce rows from are the following:
-
-|              | C-1 | C-5 | iNaturalist | OpenImages  |
-|--------------|--------|------------|------------|------|
-| ood_det_cov_   |   **0.681** |      **0.894** |   0.932 |   0.912 |
-| ood_det_sem_   |   0.662 |   0.879 |   **0.977** |   **0.941** | -->
-
 ## Note about stuned.run_from_csv.py and .csv files
 
 .csv files are created for compact scripts running and logs recording using separate repository [STAI-tuned](https://github.com/AlexanderRubinstein/STAI-tuned). To run the scrips from the .csv file it should be submitted by the commands specified in the relevant sections, such as e.g:
@@ -222,7 +200,9 @@ Immediately after the .csv file submission for the rows that are being run a "st
 
 If something does not allow the script to start the status can be stuck with `Submitted` value. In that case please check the submission log file which is by default in `tmp/tmp_log_for_run_from_csv.out`.
 
-## Bibtex
+## Citation
+
+Please cite our paper if you use OCCAM in your work:
 
 ```
 @misc{rubinstein2025objectcentriclearning,

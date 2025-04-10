@@ -14,10 +14,7 @@ from stuned.utility.utils import (
     optionally_make_dir,
 )
 from stuned.local_datasets.transforms import (
-    # DEFAULT_RESIZE_IN,
-    # DEFAULT_SIZE_IN,
     make_transforms,
-    # make_default_test_transforms_imagenet
 )
 
 
@@ -42,7 +39,6 @@ from occam.datasets.waterbirds import (
 from occam.datasets.imagenet_d import (
     IN_D_PATH,
     make_mapping_dict_imagenet_d,
-    # make_mapping_dict_imagenet_d_bg
 )
 from occam.datasets.urban_cars import (
     URBAN_CARS_PATH,
@@ -76,10 +72,6 @@ from occam.robust_classification.models import (
 from occam.ood_detection.uncertainty_scores import (
     ens_entropy_per_sample,
 )
-
-# from occam.datasets.imagenet_classes import (
-#     get_in_classes_prompts
-# )
 
 sys.path.pop(0)
 
@@ -138,22 +130,8 @@ def make_df_with_foreground_scores(
     recompute_all=False,
     filter_keyword=None,
 ):
-    # counter
-    # counter_source_df_path = "/home/oh/arubinstein17/github/densification/data/csvs/source_counter.parquet"
-    # make_source_df(
-    #     images_path="/home/oh/arubinstein17/github/densification/data/CounterAnimal/symlinked/counter",
-    #     masks_path="/home/oh/arubinstein17/github/densification/data/masks/counter_masks_1907.pkl",
-    #     separate_masks_folder=os.path.join(get_project_root_path(), "data", "separate_masks", "counter"),
-    #     source_df_path=counter_source_df_path
-    # )
-    # counter_source_df_path = "/home/oh/arubinstein17/github/densification/data/csvs/source_counter.parquet"
 
     # we might pass additional arguments in this variable by making it a tuple
-    # if isinstance(source_df_path, (tuple, list)):
-    #     extracted_source_df_path = source_df_path[0]
-    # else:
-    #     extracted_source_df_path = source_df_path
-
     extracted_source_df_path = extract_el_if_tuple(source_df_path, i=0)
     if not os.path.exists(extracted_source_df_path):
         if dataset_name == "counter_animal":
@@ -169,7 +147,7 @@ def make_df_with_foreground_scores(
         else:
             assert (
                 dataset_name == "imagenet_d"
-            )  # it was renamed from imagenet-d to imagenet_d for consistency
+            )
             make_mapping_dict_func = make_mapping_dict_imagenet_d
         make_source_df_per_dataset(
             images_path=images_path,
@@ -182,7 +160,6 @@ def make_df_with_foreground_scores(
         )
     else:
         print(f"Source df already exists: {source_df_path}")
-    # for foreground_detector in foreground_detectors:
 
     if dataset_name == "urban_cars":
         convert_label = convert_urban_cars_label
@@ -253,14 +230,13 @@ def count_number_connected_components(mask):
     return num_features
 
 
-# def filter_df(df_path, filter_keyword):
 def filter_df(df, filter_keyword):
     def populate_top_areas_dict(
         top_areas_dict, source_image_path, all_masks, top_k
     ):
         cur_areas = {}
         for cur_mask_value in np.unique(all_masks):
-            # mask, _ = load_mask(mask_path, mask_value)
+
             cur_mask_value = int(cur_mask_value)
             mask_area = (all_masks == cur_mask_value).sum()
             cur_areas[cur_mask_value] = mask_area
@@ -306,12 +282,7 @@ def filter_df(df, filter_keyword):
 
     rows_to_add = []
     for idx, row in tqdm(df.iterrows(), total=len(df)):
-        # if not "mDbAS" in row["source_image_path"]:
-        #     continue
-        # if not (row["mask_value"] == 12 or row["mask_value"] == 2):
-        # if not (row["mask_value"] == 0):
-        #     continue
-        # print("Please remove above")
+
         mask_path = row["mask_path"]
         mask, all_masks = load_mask(mask_path, row["mask_value"])
         source_image_path = row["source_image_path"]
@@ -404,7 +375,6 @@ def filter_df(df, filter_keyword):
 
     print(f"Filtered {filtered_count} / {len(df)} masks")
     return df
-    # return df
 
 
 def compute_border_touch(mask):
@@ -416,7 +386,6 @@ def compute_border_touch(mask):
 
 def make_keyword(foreground_detector, model_name):
     keyword = f"{foreground_detector}"
-    # if not foreground_detector == "bbox_iou":
     if not foreground_detector in ("bbox_iou", "ens_entropy"):
         keyword += f"{ENCODED_NAME_SEP}{model_name}"
     label_key = f"{keyword}_label"
@@ -436,6 +405,16 @@ def add_foreground_score(
     recompute_all=False,
     filter_keyword=None,
 ):
+    """
+    Add foreground scores to the source df.
+    Args:
+        source_df_path: path to the source df, e.g. "./data/csvs/source_counter.parquet"
+        foreground_detectors: list of foreground detectors, e.g. ["bbox_iou", "ens_entropy"]
+        model_name: name of the model, e.g. "clip_vit_b_16"
+        models_dict: dictionary of models, e.g. {"clip_vit_b_16": model}
+        device: device to run the model on, e.g. "cuda"
+        batch_size: batch size, e.g. 128
+    """
     model = models_dict[model_name]
 
     model, apply_mask, transform = check_model_specific_options(
@@ -446,10 +425,7 @@ def add_foreground_score(
         model, source_df_path
     )
 
-    # read df because we need info about its columns
     df = pd.read_parquet(source_df_path)
-    # TODO(Alex | 09.11.2024) - don't read df twice, take it from dataset.csv;
-    # or read only column names
 
     print(
         f"Adding foreground scores for {model_name} and detectors=({foreground_detectors})\n df: {source_df_path}"
@@ -569,7 +545,6 @@ def add_foreground_score(
 def process_outputs(
     i,
     foreground_detector,
-    # model_inputs,
     model_outputs,
     label,
     mask_value,
@@ -579,32 +554,34 @@ def process_outputs(
     model_name,
     bbox,
     mask,
-    # uncertainty_estimators_dict
 ):
+    """
+    Process the outputs of the model to compute the foreground score.
+    Args:
+        i: index of the sample
+        foreground_detector: foreground detector, e.g. "bbox_iou"
+        model_outputs: outputs of the model
+        label: label of the sample
+        mask_value: mask value of the sample
+        res: result dictionary
+    """
     keyword, label_key, metadata_key = make_keyword(
         foreground_detector, model_name
     )
 
-    # label_key = f"{keyword}_label"
-    # metadata_key = f"{keyword}_metadata"
     foreground_score, (
         max_prob,
         max_class,
         gt_prob,
         gt_label,
     ) = compute_foreground_score(
-        # model_inputs[i],
         model_outputs[i],
         label[i],
         foreground_detector,
         bbox[i],
         mask[i],
-        # uncertainty_estimators_dict=uncertainty_estimators_dict
     )
 
-    # if foreground_detector in ("oracle", "max_prob"):
-    #     foreground_score, max_prob_class = foreground_score
-    #     max_prob, max_class = max_prob_class
     cur_metadata = {
         str(mask_value): {
             "foreground_score": round(foreground_score, ROUND_DECIMALS),
@@ -622,13 +599,11 @@ def process_outputs(
 
 
 def compute_foreground_score(
-    # model_inputs,
     model_outputs,
     label,
     foreground_detector,
     bbox=None,
     mask=None,
-    # uncertainty_estimators_dict=None
 ):
     assert foreground_detector in (
         "bbox_iou",
@@ -645,18 +620,12 @@ def compute_foreground_score(
 
     metadata = (max_prob, max_class, gt_prob, label)
     if foreground_detector == "oracle":
-        # print("Probs:", probs.shape)
         score = gt_prob
-        # return gt_prob, metadata
     elif foreground_detector == "max_prob":
         score = max_prob
-        # return max_prob, metadata
     elif foreground_detector == "ens_entropy":
-        # assert uncertainty_estimators_dict is not None
-        # ens_output = uncertainty_estimators_dict[foreground_detector](model_inputs)
 
         # assert ClipEnsemble output
-        # assert isinstance(model_outputs, (list))
         assert len(model_outputs.shape) == 2  # [num_models, num_classes]
 
         score = compute_ens_entropy(model_outputs)
@@ -665,35 +634,13 @@ def compute_foreground_score(
         assert foreground_detector == "bbox_iou"
         bbox_iou = compute_bbox_fit_score(mask, bbox)
         score = bbox_iou
-        # return bbox_iou, metadata
+
     return score, metadata
 
 
 def compute_ens_entropy(model_outputs):
-    # stacked_logits = None
-    # for logits in model_outputs:
-    #     # logits = res[model_id][sample_id]
-    #     # append_dict(
-    #     #     unc_scores,
-    #     #     {model_id: {"conf": get_probs(logits).max().item()}},
-    #     #     allow_new_keys=True
-    #     # )
-    #     # # print(unc_scores)
-    #     # append_dict(
-    #     #     unc_scores,
-    #     #     {model_id: {"entropy": [entropy(logits).item()]}},
-    #     #     allow_new_keys=True
-    #     # )
-    #     # print(unc_scores)
-    #     # unc_scores[model_id]["conf"].append
-    #     # unc_scores[model_id]["entropy"] = entropy(logits).item()
-    #     if stacked_logits is None:
-    #         stacked_logits = logits.unsqueeze(0)
-    #     else:
-    #         stacked_logits = torch.cat([stacked_logits, logits.unsqueeze(0)], dim=0)
-    # stacked_logits = torch.cat(model_outputs, dim=0)
-    # return entropy(stacked_logits).item()
-    # raise NotImplementedError("Does 1 - ens_entropy help?")
+    # almost equivalent to just "- ens_entropy_per_sample(model_outputs).item()",
+    # but kept for numbers consistency
     return 1 - ens_entropy_per_sample(model_outputs).item()
 
 
@@ -719,10 +666,18 @@ def merge_dfs(df, res, label_key):
 
 
 def check_model_specific_options(model, model_name):
-    # is_clip = "lip" in model_name.lower()
+    """
+    Check model specific options. Extracts model, apply_mask and transform
+        that can be stored in the model as a tuple.
+    Args:
+        model: model
+        model_name: name of the model
+    Returns:
+        model: model
+        apply_mask: whether to apply mask
+        transform: transform
+    """
     apply_mask = True
-    # if is_clip:
-
     if isinstance(model, ModelBuilder):
         model = model.build()
 
@@ -738,6 +693,17 @@ def check_model_specific_options(model, model_name):
 
 
 def apply_dataset_specific_options(model, dataset_path):
+    """
+    Apply dataset specific options. Extracts model, original model and dataset path.
+        Applies mapper to model if it exists.
+    Args:
+        model: model
+        dataset_path: path to the dataset
+    Returns:
+        model: model
+        original_model: original model
+        dataset_path: dataset path
+    """
     original_model = model
     if isinstance(dataset_path, (tuple, list)):
         dataset_path, dataset_options = dataset_path
@@ -745,7 +711,6 @@ def apply_dataset_specific_options(model, dataset_path):
 
         # model can be None when we just want to parse dataset path
         if mapper is not None and model is not None:
-            # model = mapper(model)
             if isinstance(model, ClipEnsemble):
                 model = model  # don't wrap clip ensemble because we need it only for foreground score
             else:
@@ -759,18 +724,6 @@ def wrap_model(model, wrapper_type):
 
     assert isinstance(wrapper_type, str)
 
-    # if is_ensemble(model):
-    #     model = copy.deepcopy(model)
-    #     for i in range(len(model.submodels)):
-    #         model.submodels[i] = wrap_model(
-    #             model.submodels[i],
-    #             wrapper_type
-    #         )
-    #     if hasattr(model, "soup") and model.soup is not None:
-    #         model.soup = wrap_model(model.soup, wrapper_type)
-    # else:
-    #     # if wrapper_type == "mvh":
-    #     #     model = make_mvh_model_wrapper(model)
     if wrapper_type == "in9":
         model = make_in9_wrapper(model)
     elif wrapper_type == "waterbirds_clip":
@@ -829,35 +782,32 @@ def eval_models(
         if full_res_save_path is not None:
             optionally_make_dir(full_res_save_path)
         full_res = {}
-    # default_transform = make_default_test_transforms_imagenet()
 
-    # clean_type = get_with_assert(clean_dataloader_kwargs, "clean_type")
     clean_type = clean_dataloader_kwargs.pop("clean_type")
     eval_mode = None
 
     if clean_type == "imagenet_d_bg":
-        # dataset_name_path_list = [("clean_in_d_bg", IN_D_PATH)]
+
         dataset_name_path_list = [
             ("imagenet_d_bg", (IN_D_PATH, clean_dataloader_kwargs))
         ]
     elif clean_type == "in_val":
         raise NotImplementedError("In-val is not supported yet")
-        # dataset_name_path_list = [("in_val", (IN_VAL_PATH, clean_dataloader_kwargs))]
+
     elif clean_type == "urban_cars":
-        # raise NotImplementedError("Urban cars are not supported yet")
+
         dataset_name_path_list = [
             ("urban_cars", (URBAN_CARS_PATH, clean_dataloader_kwargs))
         ]
         eval_mode = "urban_cars"
     elif clean_type == "waterbirds":
-        # raise NotImplementedError("Waterbirds are not supported yet")
+
         standard_wb_group_paths = [
             (
                 f"waterbirds_group_{group_id}",
                 (WATERBIRDS_PATHS[group_id], clean_dataloader_kwargs),
             )
             for group_id in range(len(WATERBIRDS_PATHS))
-            # if group_id == 3 or group_id == 2
         ]
 
         only_fg_wb_group_paths = [
@@ -866,31 +816,13 @@ def eval_models(
                 (WATERBIRDS_ONLY_FG_PATHS[group_id], clean_dataloader_kwargs),
             )
             for group_id in range(len(WATERBIRDS_ONLY_FG_PATHS))
-            # if group_id == 3 or group_id == 2
         ]
-        # print(f"DEBUG: Uncomment above to run for group if group_id != 3 and group_id != 2")
 
         dataset_name_path_list = (
             standard_wb_group_paths + only_fg_wb_group_paths
         )
-        # dataset_name_path_list = [
-        #     ("waterbirds_group_0", (WB_GROUP_0_PATH, clean_dataloader_kwargs)),
-        #     ("waterbirds_group_1", (WB_GROUP_1_PATH, clean_dataloader_kwargs)),
-        #     ("waterbirds_group_2", (WB_GROUP_2_PATH, clean_dataloader_kwargs)),
-        #     ("waterbirds_group_3", (WB_GROUP_3_PATH, clean_dataloader_kwargs)),
-        # # fg
-        #     ("waterbirds_group_0_only_fg", (WB_GROUP_0_ONLY_FG_PATH, clean_dataloader_kwargs)),
-        #     ("waterbirds_group_1_only_fg", (WB_GROUP_1_ONLY_FG_PATH, clean_dataloader_kwargs)),
-        #     ("waterbirds_group_2_only_fg", (WB_GROUP_2_ONLY_FG_PATH, clean_dataloader_kwargs)),
-        #     ("waterbirds_group_3_only_fg", (WB_GROUP_3_ONLY_FG_PATH, clean_dataloader_kwargs)),
-        # # bg
-        # ("waterbirds_group_0_only_bg", (WB_GROUP_0_ONLY_BG_PATH, clean_dataloader_kwargs)),
-        # ("waterbirds_group_1_only_bg", (WB_GROUP_1_ONLY_BG_PATH, clean_dataloader_kwargs)),
-        # ("waterbirds_group_2_only_bg", (WB_GROUP_2_ONLY_BG_PATH, clean_dataloader_kwargs)),
-        # ("waterbirds_group_3_only_bg", (WB_GROUP_3_ONLY_BG_PATH, clean_dataloader_kwargs))
-        # ]
+
     elif "imagenet_9_mix_rand" in clean_type:
-        # raise NotImplementedError("Imagenet-9 mix rand is not supported yet")
 
         if clean_type == "imagenet_9_mix_rand":
             clean_dataloader_kwargs = {"mapper": "in9"}
@@ -906,7 +838,6 @@ def eval_models(
             ("imagenet_9", (IMAGENET_9_PATH, clean_dataloader_kwargs))
         ]
     else:
-        # raise NotImplementedError("counter_animal is not supported yet")
         assert (
             clean_type == "counter_animal" or clean_type == "counter_animal_gap"
         )
@@ -925,7 +856,6 @@ def eval_models(
 
         for fg_detector in fg_detectors:
             if fg_detector is None:
-                # fg_keyword = make_fg_keyword("None", model_name)
                 fg_keyword, _, _ = make_keyword("None", model_name)
                 for (
                     clean_dataset_name,
@@ -946,7 +876,7 @@ def eval_models(
                         transform=transform,
                         batch_size=batch_size,
                         return_path=True,
-                        dataloader_type=clean_dataset_name,  # TODO(Alex | 19.12.2024): check that it does not fail for CounterAnimal and ImageNet-D
+                        dataloader_type=clean_dataset_name,
                         **clean_dataloader_kwargs,
                     )
 
@@ -967,7 +897,6 @@ def eval_models(
 
                     model = original_model
             else:
-                # fg_keyword = make_fg_keyword(fg_detector, model_name)
                 fg_keyword, _, _ = make_keyword(fg_detector, model_name)
                 for parquet_name, parquet_path in parquets.items():
                     (
@@ -978,12 +907,10 @@ def eval_models(
 
                     dl = make_bbox_dl_from_csv(
                         csv_path=parquet_path,
-                        # transform=default_transform,
                         batch_size=batch_size,
                         extended_output=False,
                         dataset_task="classification",
                         num_workers=4,
-                        # return_path=True,
                         fg_keyword=fg_keyword,
                         apply_mask=apply_mask,
                         eval_transform=transform_config,
@@ -991,11 +918,6 @@ def eval_models(
                     )
 
                     full_keyword = f"{parquet_name}_{fg_keyword}@detector_{model_name}@model"
-                    # if apply_mask:
-                    #     images_extractor = None
-                    # else:
-                    #     images_extractor =
-                    # print("evaluating", full_keyword)
                     eval_on_dl(
                         full_res,
                         full_keyword,
@@ -1009,22 +931,21 @@ def eval_models(
 
                     model = original_model
 
-                # detailed_res = predict_with_model(model, dl, device='cuda')
-
-                # acc = compute_acc_from_detailed_res(detailed_res)
-                # full_keyword = f"{parquet_name}{ENCODED_NAME_SEP}{fg_keyword}"
-                # full_res[full_keyword] = acc
     print(full_res)
-    # os.makedirs(os.path.dirname(full_res_save_path), exist_ok=True)
-    # torch.save(full_res, full_res_save_path)
+
     return full_res
 
 
-# def make_fg_keyword(fg_detector, model_name):
-#     return f"{fg_detector}{ENCODED_NAME_SEP}{model_name}"
-
-
 def resolve_transform(transform_config):
+    """
+    Resolve the transform configuration.
+        If it is dict, then it is a transform config and we need to make a transform.
+        Otherwise, it is already a transform.
+    Args:
+        transform_config: transform configuration
+    Returns:
+        transform: transform
+    """
     if isinstance(transform_config, torchvision.transforms.transforms.Compose):
         return transform_config
     else:
@@ -1042,6 +963,13 @@ def eval_on_dl(
     mode=None,
     recompute_all=False,
 ):
+    """
+    Evaluate the model on the dataloader.
+    Args:
+        full_res: full results dictionary
+        full_keyword: full keyword
+        dl: dataloader
+    """
     if not recompute_all and full_keyword in full_res:
         print(f"{full_keyword} already in results")
         return
@@ -1059,9 +987,7 @@ def eval_on_dl(
     else:
         assert mode == "urban_cars"
         acc = urban_cars_eval_split(loader=dl, model=model, device=device)
-    # full_keyword = f"{parquet_name}{ENCODED_NAME_SEP}{fg_keyword}"
     full_res[full_keyword] = acc
-    # print("evaluation result:", full_res[full_keyword])
     if full_res_save_path is not None:
         optionally_make_dir(full_res_save_path)
         torch.save(full_res, full_res_save_path)
@@ -1070,6 +996,18 @@ def eval_on_dl(
 def predict_with_model(
     model, dataloader, device="cuda" if torch.cuda.is_available() else "cpu"
 ):
+    """
+    Predict with the model.
+    Args:
+        model: model
+        dataloader: dataloader
+        device: device
+    Returns:
+        results: results dictionary; keys are 'image_paths', 'predictions', 'labels'.
+            predictions are numpy arrays - integer predictions for each sample
+            labels are numpy arrays - integer labels for each sample
+            image_paths are list of strings - paths to the images
+    """
     # Set model to evaluation mode
     model.eval()
 
@@ -1083,16 +1021,15 @@ def predict_with_model(
     # No need to compute gradients during inference
     with torch.no_grad():
         for batch in tqdm(dataloader):
+
             # Assuming the dataloader returns a tuple: (images, labels, paths)
             images = batch[0]
             labels = batch[1]
 
-            # print(images.mean()) # tmp
 
             paths = None
             if len(batch) > 2:
                 paths = batch[2]
-            # images, labels, paths = batch
 
             # Transfer images and labels to the device
             if torch.is_tensor(
@@ -1161,6 +1098,12 @@ def urban_cars_eval_split(
     bg_ratio=URBAN_CARS_BG_RATIO,
     co_occur_obj_ratio=URBAN_CARS_CO_OCCUR_OBJ_RATIO,
 ):
+    """
+    Evaluate the model on the dataloader using the urban cars evaluation protocol.
+    Args:
+        loader: dataloader
+        model: model
+    """
     meter = MultiDimAverageMeter((num_class, num_class, num_class))
     total_correct = []
     total_bg_correct = []
@@ -1278,22 +1221,6 @@ def urban_cars_eval_split(
             f"{split}_both_worst_group_acc": both_worst_group_acc,
         }
     )
-
-    # if method == "erm":
-    #     # evaluate cue preference for ERM
-    #     obj_acc = total_correct.float().mean().item()
-    #     bg_acc = total_bg_correct.float().mean().item()
-    #     co_occur_obj_acc = total_co_occur_obj_correct.float().mean().item()
-
-    #     log_dict.update(
-    #         {
-    #             f"{split}_cue_obj_acc": obj_acc,
-    #             f"{split}_cue_bg_acc": bg_acc,
-    #             f"{split}_cue_co_occur_obj_acc": co_occur_obj_acc,
-    #         }
-    #     )
-
-    # self.log_to_wandb(log_dict)
 
     return log_dict
 

@@ -1,7 +1,6 @@
 import os
 import sys
 import argparse
-import torch
 import numpy as np
 import copy
 import pandas as pd
@@ -33,7 +32,7 @@ CLIP_RN50 = "clip_openai_RN50"
 
 def get_parser():
     parser = argparse.ArgumentParser(
-        description="add background scores and eval on spurious backgrounds datasets"
+        description="make tables from the paper based on the logs"
     )
     parser.add_argument(
         "--csv_with_results",
@@ -50,10 +49,18 @@ def get_parser():
 
 
 def format_percentage(x):
+    """
+    format a number as a percentage
+    x: number to format
+    """
     return f"{(100 * float(x)):.1f}"
 
 
 def format_number(x):
+    """
+    format a number as a percentage if it is a number, otherwise return initial value
+    x: number to format
+    """
     if x == "-" or not is_number(x):
         return x
     else:
@@ -61,8 +68,11 @@ def format_number(x):
 
 
 def parse_results_line(line, dataset_name):
-    # if "clean_" in line:
-    #     print("DEBUG:")
+    """
+    parse a line in logs to get the dataset name, foreground score, model, and score
+    line: line to parse
+    dataset_name: dataset name
+    """
     line = line.replace("mix_rand_", "")  # remove for ImageNet-9
     line = line.replace("bg_", "")
 
@@ -109,6 +119,11 @@ def parse_results_line(line, dataset_name):
 
 
 def is_result_line(line, dataset_name):
+    """
+    check if a line in logs contains results for a given dataset
+    line: line to check
+    dataset_name: dataset name
+    """
     line_split = line.split()
     if len(line_split) < 2:
         return False
@@ -122,6 +137,9 @@ def is_result_line(line, dataset_name):
 
 
 def main():
+    """
+    parse experiment logs and make tables from the paper based on the logs
+    """
     parser = get_parser()
     args = parser.parse_args()
     csv = pd.read_csv(args.csv_with_results)
@@ -140,13 +158,11 @@ def main():
             f.seek(0, os.SEEK_END)
             f.seek(
                 f.tell() - min(f.tell(), NUM_LAST_LINES_IN_STDOUT)
-            )  # Read last 1000 chars
+            )  # Read last chars
             stdout = f.read()
         last_lines = stdout.split("\n")
         for line in last_lines:
             line = line.replace("clean_", "")  # remove for CounterAnimal clean
-            # if "clean_" in line and "0.658368" in line:
-            #     print("DEBUG:")
             line = line.split("(log): ")[
                 -1
             ]  # in case log is on the same line as the results
@@ -249,20 +265,6 @@ def main():
     table_4 = make_table_4(results_df)
     table_5 = make_table_5(results_df)
 
-    # ordered_rows = [
-    #     [("arch", "CLIP"), ("mask_source", "-"), ("mask_method", "-"), ("fg_score", "-"), ("model", "clip_openai_ViT-L/14")],
-    # ]
-
-    # table_4 = None
-    # for row in ordered_rows:
-    #     row_4 = results_df
-    #     for key, value in row:
-    #         row_4 = row_4[row_4[key] == value]
-    #     if table_4 is None:
-    #         table_4 = row_4
-    #     else:
-    #         table_4 = pd.concat([table_4, row_4], ignore_index=True)
-
     pd.set_option(
         "display.max_colwidth", MAX_COL_WIDTH
     )  # to see long model names
@@ -284,13 +286,17 @@ def main():
     table_3.to_csv(os.path.join(args.result_folder, "Table_3.csv"), index=False)
     table_4.to_csv(os.path.join(args.result_folder, "Table_4.csv"), index=False)
     table_5.to_csv(os.path.join(args.result_folder, "Table_5.csv"), index=False)
-    # print(results_df)
-    # results_df.to_csv(
-    #     os.path.join(args.result_folder, "Table_4.csv"), index=False
-    # )
 
 
 def filter_table_by_ordered_rows(results_df, ordered_rows, col_names):
+    """
+    filter the results dataframe by the ordered rows
+    results_df: results dataframe
+    ordered_rows: ordered rows to filter by; each row is a list of values,
+        where each value is the value to filter by
+        for the corresponding column in col_names
+    col_names: column names to filter by
+    """
     table = None
     for ordered_row in ordered_rows:
         row = results_df
@@ -304,6 +310,11 @@ def filter_table_by_ordered_rows(results_df, ordered_rows, col_names):
 
 
 def make_table_2(results_df, section):
+    """
+    make table 2
+    results_df: results dataframe
+    section: section of the table to make (a, b, c, d)
+    """
     col_names = ["arch", "mask_method", "mask_source", "fg_score", "model"]
     cols_order = [
         "arch",
@@ -341,28 +352,20 @@ def make_table_2(results_df, section):
     else:
         raise NotImplementedError(f"Section {section} not implemented")
 
-    # table = None
-    # for ordered_row in ordered_rows:
-    #     row = results_df
-    #     for key, value in zip(col_names, ordered_row):
-    #         row = row[row[key] == value]
-    #     if table is None:
-    #         table = row
-    #     else:
-    #         table = pd.concat([table, row], ignore_index=True)
     table = filter_table_by_ordered_rows(results_df, ordered_rows, col_names)
 
     table = table[cols_order]
 
     table = table.map(format_number)
 
-    # for i, row in table_4.iterrows():
-    #     row["model"] = row["model"].split("@")[0]
-
     return table
 
 
 def make_table_3(results_df):
+    """
+    make table 3
+    results_df: results dataframe
+    """
     col_names = ["arch", "mask_method", "mask_source", "fg_score", "model"]
     cols_order = [
         "arch",
@@ -391,39 +394,29 @@ def make_table_3(results_df):
 
 
 def make_table_4(results_df):
+    """
+    make table 4
+    results_df: results dataframe
+    """
     col_names = ["arch", "mask_method", "mask_source", "fg_score", "model"]
     ordered_rows = [
         ["CLIP", "-", "-", "-", CLIP],
         #
-        # ["CLIP", "Gray BG + Crop", "dino_ft", "max_prob", CLIP],
         ["CLIP", "Gray BG + Crop", "dino_ft", "ens_entropy", CLIP],
         ["CLIP", "Gray BG + Crop", "dino_ft", "oracle", CLIP],
         #
-        # ["CLIP", "Gray BG + Crop", "cropformer", "max_prob", CLIP],
         ["CLIP", "Gray BG + Crop", "cropformer", "ens_entropy", CLIP],
         ["CLIP", "Gray BG + Crop", "cropformer", "oracle", CLIP],
         #
         ["AlphaCLIP", ALPHA_ONE, "-", "-", ALPHA_CLIP],
         #
-        # ["AlphaCLIP", ALPHA_CHANNEL, "dino_ft", "max_prob", ALPHA_CLIP],
         ["AlphaCLIP", ALPHA_CHANNEL, "dino_ft", "ens_entropy", ALPHA_CLIP],
         ["AlphaCLIP", ALPHA_CHANNEL, "dino_ft", "oracle", ALPHA_CLIP],
         #
-        # ["AlphaCLIP", ALPHA_CHANNEL, "cropformer", "max_prob", ALPHA_CLIP],
         ["AlphaCLIP", ALPHA_CHANNEL, "cropformer", "ens_entropy", ALPHA_CLIP],
         ["AlphaCLIP", ALPHA_CHANNEL, "cropformer", "oracle", ALPHA_CLIP],
-        # [("arch", "CLIP"), ("mask_source", "-"), ("mask_method", "-"), ("fg_score", "-"), ("model", "clip_openai_ViT-L/14")],
     ]
 
-    # table_4 = None
-    # for row in ordered_rows:
-    #     row_4 = results_df
-    #     for key, value in zip(col_names, row):
-    #         row_4 = row_4[row_4[key] == value]
-    #     if table_4 is None:
-    #         table_4 = row_4
-    #     else:
-    #         table_4 = pd.concat([table_4, row_4], ignore_index=True)
     table = filter_table_by_ordered_rows(results_df, ordered_rows, col_names)
 
     # Add delta column with difference between common and counter
@@ -444,13 +437,14 @@ def make_table_4(results_df):
 
     table = table.map(format_number)
 
-    # for i, row in table_4.iterrows():
-    #     row["model"] = row["model"].split("@")[0]
-
     return table
 
 
 def make_table_5(results_df):
+    """
+    make table 5
+    results_df: results dataframe
+    """
     col_names = ["arch", "mask_method", "mask_source", "fg_score", "model"]
     cols_order = [
         "arch",
@@ -462,35 +456,27 @@ def make_table_5(results_df):
 
     ordered_rows = [
         ["CLIP", "-", "-", "-", CLIP],
-        # ["CLIP", "Gray BG + Crop", "dino_ft", "oracle", CLIP],
         ["CLIP", "Gray BG + Crop", "cropformer", "max_prob", CLIP],
         ["CLIP", "Gray BG + Crop", "cropformer", "ens_entropy", CLIP],
         ["CLIP", "Gray BG + Crop", "cropformer", "oracle", CLIP],
         ["CLIP", "-", "-", "only_fg", CLIP],
     ]
 
-    # table = None
-    # for ordered_row in ordered_rows:
-    #     row = results_df
-    #     for key, value in zip(col_names, ordered_row):
-    #         row = row[row[key] == value]
-    #     if table is None:
-    #         table = row
-    #     else:
-    #         table = pd.concat([table, row], ignore_index=True)
     table = filter_table_by_ordered_rows(results_df, ordered_rows, col_names)
 
     table = table[cols_order]
 
     table = table.map(format_number)
 
-    # for i, row in table_4.iterrows():
-    #     row["model"] = row["model"].split("@")[0]
-
     return table
 
 
 def add_delta_column(table, name="delta"):
+    """
+    add a column with the difference between common and counter for CounterAnimal
+    table: table to add the column to
+    name: name of the column to add
+    """
     table[name] = table.apply(
         lambda row: float(row["common"]) - float(row["counter"])
         if row["common"] != "-" and row["counter"] != "-"
@@ -500,6 +486,10 @@ def add_delta_column(table, name="delta"):
 
 
 def single_non_nan(x):
+    """
+    return the only non-nan value in the series,
+    assert that there is only one non-nan value (needed when aggregating rows after grouping)
+    """
     non_nan = x.dropna()
     if len(non_nan) == 1:
         return non_nan.iloc[0]

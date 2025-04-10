@@ -230,11 +230,11 @@ class CropFormer(nn.Module):
         ## make new images
         batched_inputs_new = []
         for batched_input in batched_inputs:
-            ori_infos = {"height": batched_input["height"],
-                        "width": batched_input["width"],
-                        "image": batched_input["image"],
-                        # "file_name": batched_input["file_name"],
-                        }
+            ori_infos = {
+                "height": batched_input["height"],
+                "width": batched_input["width"],
+                "image": batched_input["image"],
+            }
             if "instances" in batched_input.keys():
                 ori_instances = batched_input["instances"]
                 ori_instances.original_indices = torch.arange(0, len(ori_instances)).long()

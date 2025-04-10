@@ -1,73 +1,35 @@
-# import wget
 import os
 import sys
-
-# import shutil
 import torch
 import pandas as pd
-
-# from tqdm import tqdm
-# import xml.etree.ElementTree as ET
 import numpy as np
-
-# import matplotlib.pyplot as plt
 import torchvision
 import PIL
-
-# import json
 import yaml
-from sklearn.metrics import PrecisionRecallDisplay, roc_auc_score, roc_curve
 from stuned.utility.utils import (
     get_project_root_path,
-    load_from_pickle,
     get_with_assert,
     get_hash,
 )
 from torch.utils.data import DataLoader, Subset, Dataset
 import copy
 from sklearn.model_selection import train_test_split
-from detectron2.data.detection_utils import read_image
-
-
 from stuned.utility.utils import (
-    show_images,
-    load_from_pickle,
-    append_dict,
     apply_random_seed,
 )
 from stuned.local_datasets.imagenet1k import get_imagenet_dataset
 from stuned.local_datasets.transforms import (
-    DEFAULT_RESIZE_IN,
-    DEFAULT_SIZE_IN,
     make_transforms,
-    make_default_test_transforms_imagenet,
 )
 
 
 # local modules
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath("")), "src"))
-# import densifier
 from occam.datasets.utils import open_pil_image, subpath, load_xml
 from occam.robust_classification.masking import (
     DEFAULT_VISUAL_PROMPT_TYPE,
     apply_visual_prompts,
-    # _build_timm_model,
-    is_background,
 )
-
-# from occam.utility.utils_for_notebooks import (
-#     make_symlink_cmd,
-#     tensor_for_matplotlib,
-#     load_xml
-# )
-# from occam.detection.uncertainty_scores import (
-#     div_continous_unique_per_sample,
-#     average_energy_per_sample,
-#     ens_entropy_per_sample,
-#     entropy,
-#     ens_conf_per_sample,
-#     get_probs
-# )
 sys.path.pop(0)
 
 
@@ -124,9 +86,7 @@ def make_bbox(bbox_path, n_channels=3):
 
 
 def compute_bbox_fit_score(mask, bbox, extended_output=False):
-    # intersection = (mask * bbox).sum()
-    # outside_bbox = (mask * (1 - bbox)).sum()
-    # bbox_fit_score = intersection / max(1, outside_bbox)  # to filter out background
+
     mask_shape_len = len(mask.shape)
     assert mask.shape == bbox.shape
     if mask_shape_len == 4:
@@ -144,7 +104,6 @@ def compute_bbox_fit_score(mask, bbox, extended_output=False):
     union = union.mean().item()
 
     if extended_output:
-        # return bbox_fit_score, intersection, outside_bbox
         return bbox_fit_score, intersection, union
     else:
         return bbox_fit_score
@@ -175,7 +134,8 @@ def iou(pred: torch.Tensor, target: torch.Tensor, eps=1e-6) -> torch.Tensor:
     return iou, intersection, union
 
 
-# TODO(Alex | 22.10.2024): Keep either this or previous version, avoid code duplication
+# Technically it is not only for ImageNet and not necessarily requires bounding boxes,
+# but we keep the name for legacy reasons
 class ImageNetBBoxAnnotationsV2(Dataset):
     """
     A PyTorch Dataset for ImageNet bounding box annotations with support for detection
@@ -237,14 +197,13 @@ class ImageNetBBoxAnnotationsV2(Dataset):
         filter_keyword=None,
     ):
         super().__init__()
-        # self.csv_path = csv_path
         if csv_path[-8:] == ".parquet":
             self.csv = pd.read_parquet(csv_path)
         else:
             assert csv_path[-4:] == ".csv"
             self.csv = pd.read_csv(csv_path, na_values=None)
         self.image_transform = image_transform
-        self.mask_transform = mask_transform  # TODO(Alex | 08.11.2024): should be renamed to common_transform and specific_transform
+        self.mask_transform = mask_transform
         self.full_transform = torchvision.transforms.Compose(
             [self.mask_transform, self.image_transform]
         )
@@ -255,14 +214,12 @@ class ImageNetBBoxAnnotationsV2(Dataset):
             self.current_cache_path = os.path.join(cache_path, csv_hash)
             print(f"Current cache path: {self.current_cache_path}")
             os.makedirs(self.current_cache_path, exist_ok=True)
-            # self.cache_path = cache_path
         else:
             self.current_cache_path = None
         self.allow_bbox_shape_mismatch = allow_bbox_shape_mismatch
 
         # filter by image names
         if images_list is not None:
-            # self.active_indices = []
             pattern = "|".join(
                 [
                     clean_regex(f"{image_basename.split('.')[0]}")
@@ -298,12 +255,6 @@ class ImageNetBBoxAnnotationsV2(Dataset):
 
         self.apply_mask = apply_mask
 
-        # # for classification keep only image with target object
-        # for idx in self.mapping_dict.keys():
-        #     item = self.mapping_dict[idx]
-        #     if item[-1] == 1:
-        #         self.active_indices.append(idx)
-
     def __len__(self):
         return len(self.csv)
 
@@ -322,22 +273,13 @@ class ImageNetBBoxAnnotationsV2(Dataset):
                     obj_type="applied_mask_without_transform",
                 )
                 if applied_mask is not None:
-                    # TODO(Alex | 26.10.2024): keep dims order inside apply_mask
                     applied_mask = np.transpose(applied_mask, (1, 2, 0))
                     applied_mask = self.full_transform(applied_mask)
                     classification_label = csv_row.iloc[1]
                     return_tuple = (applied_mask, classification_label)
 
         if return_tuple is None:
-            # (
-            #     source_image_path,
-            #     classification_label,
-            #     image_to_label,
-            #     main_object_label,
-            #     mask_path,
-            #     mask_value,
-            #     bbox_path
-            # ) = csv_row
+
             source_image_path = csv_row.iloc[0]
             classification_label = csv_row.iloc[1]
             image_to_label = csv_row.iloc[2]
@@ -352,7 +294,6 @@ class ImageNetBBoxAnnotationsV2(Dataset):
                     and metadata[0] == "{"
                     and metadata[-1] == "}"
                 ):
-                    # metadata = json.loads(metadata)
                     metadata = yaml.safe_load(metadata)
 
                     if isinstance(metadata, dict) and len(metadata) == 1:
@@ -362,8 +303,7 @@ class ImageNetBBoxAnnotationsV2(Dataset):
                 metadata = None
 
             return_tuple = get_return_tuple(
-                # self,
-                # csv_row
+
                 idx,
                 source_image_path,
                 classification_label,
@@ -382,9 +322,6 @@ class ImageNetBBoxAnnotationsV2(Dataset):
                 metadata=metadata,
                 apply_mask=self.apply_mask,
             )
-
-        # for el in return_tuple:
-        #     print(type(el)) # tmp
 
         # to work with collate we can't leave Nones here
         cleaned_return_tuple = []
@@ -419,7 +356,6 @@ def prepare_applied_mask_maker(image, mask):
         return apply_visual_prompts(
             image,
             mask,
-            # visual_prompt_type=("rectangle_crop_resize", "naive_gray"),
             visual_prompt_type=DEFAULT_VISUAL_PROMPT_TYPE,
             enforce_square_shape=False,
         ).squeeze(0)
@@ -436,13 +372,8 @@ def try_to_get_from_cache(current_cache_path, idx, make_func, obj_type):
         if os.path.exists(cache_path):
             res = torch.load(cache_path)
         else:
-            # bbox = make_bbox(bbox_path)
-            # if make_func is None:
-            #     res = None
-            # else:
             res = make_func()
             torch.save(res, cache_path)
-            # torch.save(bbox, cache_path)
     else:
         res = make_func()
     return res
@@ -459,8 +390,6 @@ def load_mask(mask_path, mask_value):
 
 
 def get_return_tuple(
-    # self,
-    # csv_row
     idx,
     source_image_path,
     classification_label,
@@ -510,45 +439,10 @@ def get_return_tuple(
         current_cache_path,
     ):
         assert mask is not None
-        # assert bbox is not None
-        # if bbox is None:
-        #     bbox = np.ones_like(mask)
-
-        # # stacked_image_mask_bbox = np.concatenate([image, mask, bbox], axis=2)
-
-        # # stacked_image_mask_bbox = mask_transform(stacked_image_mask_bbox)
-        # # # apply the same transform to all chunks
-        # # image, mask, bbox = torch.split(stacked_image_mask_bbox, [3, 1, 1], dim=0)
-        # bbox = (bbox > 0).to(bbox.dtype) # to avoid interpolation artifacts
-        # mask = (mask > 0).to(mask.dtype) # to avoid interpolation artifacts
-
-        # bbox = torch.cat([bbox] * 3, dim=0)
-        # mask = torch.cat([mask] * 3, dim=0)
-
-        # image = image_transform(image)
-
-        # seed = torch.randint(0, 2**32, (1,)).item()
-
-        # apply_random_seed(seed)
-        # image = mask_transform(image) # all but normalization
-        # image = image_transform(image) # normalization
-        # apply_random_seed(seed)
-        # bbox = mask_transform(bbox)
-        # apply_random_seed(seed)
-        # mask = mask_transform(mask)
-
-        # bbox = (bbox > 0).to(image.dtype) # to avoid interpolation artifacts
-        # mask = (mask > 0).to(image.dtype) # to avoid interpolation artifacts
-
-        # bbox = torch.cat([bbox] * 3, dim=0)
-        # mask = torch.cat([mask] * 3, dim=0)
-        # assert image.shape == bbox.shape == mask.shape
 
         image, mask, bbox = transform_image_mask_bbox(
             image, mask, bbox, image_transform, mask_transform
         )
-
-        # assert image.shape == bbox.shape
 
         # can have empty mask after aggresive transform, e.g. strong crop
         if mask.max() > 0:
@@ -564,7 +458,6 @@ def get_return_tuple(
             applied_mask = (
                 torch.zeros_like(image, dtype=torch.float32) * 0.5
             )  # gray image
-        # prepare_applied_mask_maker returns float, while zeros_like returns double, we want to always use float
         return image, mask, bbox, applied_mask
 
     def transform_after_mask_apply(image, mask, transform, current_cache_path):
@@ -577,20 +470,9 @@ def get_return_tuple(
             ),
             obj_type="applied_mask_without_transform",
         )
-        # TODO(Alex | 26.10.2024): keep dims order inside apply_mask
         applied_mask = np.transpose(applied_mask, (1, 2, 0))
         applied_mask = transform(applied_mask)
         return applied_mask
-
-    # (
-    #     source_image_path,
-    #     classification_label,
-    #     image_to_label,
-    #     main_object_label,
-    #     mask_path,
-    #     mask_value,
-    #     bbox_path
-    # ) = csv_row
 
     image_path = source_image_path
     label = classification_label
@@ -598,17 +480,17 @@ def get_return_tuple(
     if apply_mask:
         image = open_pil_image(source_image_path)
     else:
+        # imoprt here, because detectron2 is not installed by default
+        from detectron2.data.detection_utils import read_image
         image = read_image(
             source_image_path, format="BGR"
         )  # https://github.com/facebookresearch/detectron2/blob/c69939aa85460e8135f40bce908a6cddaa73065f/detectron2/data/detection_utils.py#L166
         image = image[
             :, :, ::-1
-        ]  # TODO(Alex | 09.12.2024): can we read directly to RGB?
-        # image.flags.writeable = True # to avoid warnings
+        ]
         image = np.copy(image)  # to avoid warnings about non-writeable arrays
         # image = image / 255 # uint8 -> float32
 
-    # if not isinstance(bbox_path, str) and np.isnan(bbox_path):
     if bbox_path is None or (
         not isinstance(bbox_path, str) and np.isnan(bbox_path)
     ):
@@ -644,7 +526,6 @@ def get_return_tuple(
                 else:
                     raise ValueError("bbox shape mismatch")
 
-    # if mask_path is not None:
     if not isinstance(mask_path, str) and np.isnan(mask_path):
         # treat bbox as mask
         assert bbox_path is not None
@@ -652,12 +533,6 @@ def get_return_tuple(
         all_masks = None
         mask = bbox
     else:
-        # all_masks = torch.load(mask_path, weights_only=False)
-        # assert all_masks.max() >= mask_value, (
-        #     f"mask_value: {mask_value} is greater than the maximum mask "
-        #     f"value: {all_masks.max()} for {mask_path}"
-        # )
-        # mask = all_masks == mask_value
         mask, all_masks = load_mask(mask_path, mask_value)
         if len(mask.shape) == 3:
             mask = mask[
@@ -665,7 +540,6 @@ def get_return_tuple(
             ]  # extract first channel as we will duplicate channels later
         assert len(mask.shape) == 2
         mask = mask[..., None]
-        # mask = np.transpose(mask, (1, 2, 0))
         assert mask.shape[2] == 1
         assert mask.shape[:2] == image.shape[:2]
 
@@ -689,14 +563,6 @@ def get_return_tuple(
                 full_transform,
                 current_cache_path=current_cache_path,
             )
-        # else:
-        #     applied_mask = (image, mask)
-        # if extended_output:
-        #     # image = torch.Tensor(image)
-        #     if mask is not None:
-        #         mask = torch.Tensor(mask)
-        #     if bbox is not None:
-        #         bbox = torch.Tensor(bbox)
 
     else:
         image, mask, bbox, applied_mask = transform_before_mask_apply(
@@ -709,13 +575,8 @@ def get_return_tuple(
             current_cache_path=current_cache_path,
         )
 
-    # applied_mask = applied_mask.squeeze(0)
-
     if extended_output or not apply_mask:
         if dataset_task == "classification":
-            # image = image_transform(mask_transform(image))
-            # mask = mask_transform(mask)
-            # bbox = mask_transform(bbox)
             image, mask, bbox = transform_image_mask_bbox(
                 image, mask, bbox, image_transform, mask_transform
             )
@@ -724,12 +585,6 @@ def get_return_tuple(
         applied_mask = (image, mask)
 
     if extended_output:
-        # TODO(Alex | 07.10.2024): compute it only once in init
-        # intersection_info = compute_bbox_fit_score(
-        #     mask,
-        #     bbox,
-        #     extended_output=True
-        # )
         if metadata is None:
             metadata = {}
         else:
@@ -737,21 +592,7 @@ def get_return_tuple(
 
         metadata["mask_value"] = mask_value
 
-        # metadata = str(metadata)
-
-        # resize for stacking in batches
-
         all_masks = mask_transform(all_masks)
-        # if dataset_task == "classification":
-        #     image = image_transform(mask_transform(image))
-        #     mask = mask_transform(mask)
-        #     bbox = mask_transform(bbox)
-
-        # print("image.shape", image.shape)
-        # print("mask.shape", mask.shape)
-        # print("bbox.shape", bbox.shape)
-        # print("applied.shape", applied_mask.shape)
-        # print("all_masks.shape", all_masks.shape) # tmp 6
 
         return_tuple = (
             idx,
@@ -763,7 +604,6 @@ def get_return_tuple(
             is_main_object,
             image_path,
             all_masks,
-            # intersection_info
             metadata,
         )
     else:
@@ -782,10 +622,6 @@ def get_return_tuple(
     return return_tuple
 
 
-# def subpath(path, k, sep=""):
-#     return sep.join(path.split(os.sep)[-k:])
-
-
 def pathprefix(path, k, sep=""):
     return sep.join(path.split(os.sep)[:-k])
 
@@ -794,354 +630,6 @@ def get_mask_id_prefix(masks, k=2):
     assert len(masks)
     first_key = list(masks.keys())[0]
     return pathprefix(first_key, k, sep=os.sep)
-
-
-class ImageNetBBoxAnnotations(Dataset):
-    def __init__(
-        self,
-        base_dataset,
-        bboxes_folder,
-        masks,  # can be either dict or path to pickle
-        mapping_dict_path,
-        mask_per_value_folder,
-        image_transform,
-        mask_transform,
-        dataset_task="detection",
-        extended_output=False,
-        images_list=None,
-    ):
-        super().__init__()
-        self.base_dataset = base_dataset
-        self.bboxes_folder = bboxes_folder
-        self.masks = masks
-        self.image_transform = image_transform
-        self.mask_transform = mask_transform
-        self.extended_output = extended_output
-        self.images_list = images_list
-
-        if isinstance(self.masks, str) and self.extended_output:
-            self.masks = load_from_pickle(self.masks)
-
-        assert dataset_task in ["detection", "classification"]
-        self.dataset_task = dataset_task
-
-        if os.path.basename(self.bboxes_folder) == "val":
-            self.bboxes_type = "val"
-        else:
-            self.bboxes_type = "train"
-
-        self.mapping_dict = self._make_mapping_dict(
-            mapping_dict_path, mask_per_value_folder
-        )
-        if "mismatch" in self.mapping_dict:
-            mismatch_info = self.mapping_dict.pop("mismatch")
-            print(f"Mismatch info: {mismatch_info}")
-        if dataset_task == "detection":
-            self.active_indices = list(self.mapping_dict.keys())
-        else:
-            self.active_indices = []
-            # for classification keep only image with target object
-            for idx in self.mapping_dict.keys():
-                item = self.mapping_dict[idx]
-                if item[-1] == 1:
-                    self.active_indices.append(idx)
-
-        self.filter_images_list()
-
-        self.targets = []
-        for idx in self.active_indices:
-            item = self.mapping_dict[idx]
-            base_id = item[0]
-            _, target = self.base_dataset.samples[base_id]
-            self.targets.append(target)
-
-    # keep only images from the images_list, basenames are given
-    def filter_images_list(self):
-        if self.images_list is not None:
-            new_indices = []
-            for idx in self.active_indices:
-                item = self.mapping_dict[idx]
-                image_path = os.path.basename(item[1])
-                if image_path in self.images_list:
-                    new_indices.append(idx)
-            self.active_indices = new_indices
-
-    def __len__(self):
-        return len(self.active_indices)
-
-    def _make_mapping_dict(
-        self, mapping_dict_path, mask_per_value_folder, save_every=100
-    ):
-        raise NotImplementedError(
-            'Not implemented, see "make_df_with_foreground_scores"'
-        )
-
-        # def is_wnid(class_id):
-        #     is_wnid = True
-        #     if not len(class_id) == 9:
-        #         is_wnid = False
-
-        #     if not class_id[0] == "n":
-        #         is_wnid = False
-
-        #     if not class_id[1:].isalnum():
-        #         is_wnid = False
-
-        #     return is_wnid
-
-        # def process_masks(
-        #     all_masks,
-        #     image_path,
-        #     mask_id,
-        #     mapping_dict,
-        #     bbox_path
-        # ):
-
-        #     def update_max_and_key(cur_value, cur_key, cache, cache_key):
-        #         # update max value
-        #         max_value, max_key = cache[cache_key]
-        #         if cur_value > max_value:
-        #             cache[cache_key] = [cur_value, cur_key]
-
-        #     cur_masks = all_masks[mask_id]['mask']
-        #     mask_values = np.unique(cur_masks).tolist()
-
-        #     # variables to find mask with the best bbox_fit_score
-        #     cache_for_max_bbox_fit_score = {
-        #         "all": [np.inf * -1, None],
-        #         "non-bg": [np.inf * -1, None]
-        #     }
-
-        #     key_per_mask_value_max = None
-        #     # key_per_mask_value_no_bg = None
-        #     # bbox = make_bbox(bbox_path).numpy()
-        #     bbox = make_bbox(bbox_path)
-        #     bbox = (bbox == 1)
-
-        #     mask_shape = cur_masks.shape[-2:]
-        #     bbox_shape = bbox.shape[-2:]
-        #     if mask_shape != bbox_shape:
-        #         mismatch_info = (
-        #             mask_shape,
-        #             bbox_shape,
-        #             image_path,
-        #             mask_id,
-        #             bbox_path
-        #         )
-        #         if "mismatch" not in mapping_dict:
-        #             mapping_dict["mismatch"] = [mismatch_info]
-        #         else:
-        #             mapping_dict["mismatch"].append(mismatch_info)
-        #         print(mismatch_info)
-        #         return
-
-        #     cur_mapping_dict = {}
-
-        #     for mask_value in mask_values:
-        #         key_per_mask_value = (mask_id + f"_{mask_value}").replace("/", "_")
-
-        #         if key_per_mask_value in mapping_dict:
-        #             continue
-
-        #         mask_per_value = (cur_masks == mask_value)
-        #         if mask_per_value.sum() < MIN_NON_ZERO_PIXELS:
-        #             continue
-        #         mask_per_value = np.concatenate(
-        #             [mask_per_value[None, ...]] * bbox.shape[0],
-        #             axis=0
-        #         )
-
-        #         mask_per_value_path = os.path.join(
-        #             mask_per_value_folder,
-        #             key_per_mask_value + ".pt"
-        #         )
-
-        #         torch.save(mask_per_value, mask_per_value_path)
-        #         is_main_object = 0
-
-        #         cur_mapping_dict[key_per_mask_value] = [
-        #             base_id,
-        #             image_path,
-        #             bbox_path,
-        #             mask_id,
-        #             mask_per_value_path,
-        #             is_main_object
-        #         ]
-
-        #         mask_per_value = (torch.Tensor(mask_per_value) == 1)
-        #         # bbox = (torch.Tensor(bbox) == 1)
-
-        #         bbox_fit_score = compute_bbox_fit_score(mask_per_value, bbox)
-
-        #         update_max_and_key(
-        #             bbox_fit_score,
-        #             key_per_mask_value,
-        #             cache_for_max_bbox_fit_score,
-        #             "all"
-        #         )
-        #         if not is_background(
-        #             mask_per_value[0],
-        #             threshold=NUM_CORNER_PIXELS_FOR_BG,
-        #             to_extract=False
-        #         ):
-        #             update_max_and_key(
-        #                 bbox_fit_score,
-        #                 key_per_mask_value,
-        #                 cache_for_max_bbox_fit_score,
-        #                 "non-bg"
-        #             )
-
-        #     key_per_mask_value_max = cache_for_max_bbox_fit_score["non-bg"][1]
-        #     if key_per_mask_value_max is None:
-        #         key_per_mask_value_max = cache_for_max_bbox_fit_score["all"][1]
-
-        #     assert key_per_mask_value_max is not None
-        #     item_to_update = cur_mapping_dict[key_per_mask_value_max]
-        #     item_to_update[-1] = 1
-        #     cur_mapping_dict[key_per_mask_value_max] = item_to_update
-
-        #     mapping_dict |= cur_mapping_dict
-
-        # tmp_mapping_dict_path = mapping_dict_path + ".tmp"
-
-        # if not os.path.exists(mapping_dict_path):
-        #     os.makedirs(os.path.dirname(mapping_dict_path), exist_ok=True)
-
-        #     if isinstance(self.masks, str):
-        #         self.masks = load_from_pickle(self.masks)
-
-        #     mask_id_prefix = get_mask_id_prefix(self.masks)
-
-        #     if os.path.exists(tmp_mapping_dict_path):
-        #         print("Loading mapping dict from tmp file")
-        #         mapping_dict = torch.load(tmp_mapping_dict_path)
-        #     else:
-        #         mapping_dict = {}
-
-        #     cnt = 0
-        #     os.makedirs(mask_per_value_folder, exist_ok=True)
-
-        #     for base_id in tqdm(range(len(self.base_dataset.samples))):
-
-        #         path_target = self.base_dataset.samples[base_id]
-        #         path = path_target[0]
-
-        #         image_name = os.path.basename(path)
-
-        #         class_id = os.path.basename(os.path.dirname(path))
-
-        #         # if is_wnid(class_id):
-        #         if self.bboxes_type == "val":
-        #             folder_path = self.bboxes_folder
-        #         else:
-
-        #             folder_path = os.path.join(
-        #                 self.bboxes_folder,
-        #                 class_id
-        #             )
-
-        #         bbox_path = os.path.join(
-        #             folder_path,
-        #             image_name.replace(".JPEG", ".xml")
-        #         )
-
-        #         if not os.path.exists(bbox_path):
-        #             continue
-
-        #         mask_id = os.path.join(mask_id_prefix, class_id, image_name)
-        #         if not mask_id in self.masks:
-        #             continue
-
-        #         process_masks(self.masks, path, mask_id, mapping_dict, bbox_path)
-        #         cnt += 1
-        #         if cnt == len(self.masks):
-        #             break
-
-        #         if cnt % save_every == 0:
-        #             torch.save(mapping_dict, tmp_mapping_dict_path)
-        # else:
-        #     mapping_dict = torch.load(mapping_dict_path)
-
-        # torch.save(mapping_dict, mapping_dict_path)
-        # if os.path.exists(tmp_mapping_dict_path):
-        #     os.remove(tmp_mapping_dict_path)
-        # return mapping_dict
-
-    def __getitem__(self, idx):
-        active_idx = self.active_indices[idx]
-        (
-            base_id,
-            image_path,
-            bbox_path,
-            mask_id,
-            mask_per_value_path,
-            is_main_object,
-        ) = self.mapping_dict[active_idx]
-        path, label = self.base_dataset.samples[base_id]
-        image = self.base_dataset.loader(path)
-
-        bbox = make_bbox(bbox_path)
-
-        mask = torch.load(mask_per_value_path)
-
-        bbox = bbox.permute(1, 2, 0).numpy()
-        mask = np.transpose(mask, (1, 2, 0))
-
-        # old transforms
-        seed = torch.randint(0, 2**32, (1,)).item()
-
-        apply_random_seed(seed)
-        image = self.image_transform(image)
-
-        apply_random_seed(seed)
-        bbox = self.mask_transform(bbox)
-        apply_random_seed(seed)
-        mask = self.mask_transform(mask)
-
-        if mask.max() == 0:  # avoid empty masks
-            applied_mask = torch.ones_like(image) * 0.5  # gray image
-        else:
-            applied_mask = apply_visual_prompts(
-                image.unsqueeze(0),
-                mask.unsqueeze(0),
-                # visual_prompt_type=("naive_gray", "rectangle_crop_resize"),
-                visual_prompt_type=DEFAULT_VISUAL_PROMPT_TYPE,
-            )
-
-        applied_mask = applied_mask.squeeze(0)
-
-        if self.extended_output:
-            # TODO(Alex | 07.10.2024): compute it only once in init
-            intersection_info = compute_bbox_fit_score(
-                mask, bbox, extended_output=True
-            )
-            all_masks = self.masks[mask_id]["mask"]
-            return_tuple = (
-                idx,
-                image,
-                label,
-                bbox,
-                mask,
-                applied_mask,
-                is_main_object,
-                image_path,
-                all_masks,
-                intersection_info,
-            )
-        else:
-            if self.dataset_task == "classification":
-                return_tuple = (applied_mask, label)
-            else:
-                return_tuple = (
-                    image,
-                    label,
-                    bbox,
-                    mask,
-                    applied_mask,
-                    is_main_object,
-                    image_path,
-                )
-        return return_tuple
 
 
 def make_image_mask_transforms(transform_config):
@@ -1156,9 +644,6 @@ def make_image_mask_transforms(transform_config):
     ]
 
     transform = make_transforms(transform_config)
-
-    # masks = load_from_pickle(masks_path)
-    # masks = masks_path
 
     mask_transform = make_transforms(mask_transform_config)
     return transform, mask_transform
@@ -1185,7 +670,6 @@ def make_common_and_specific_transforms(transform_config):
             ):
                 flattened_compose = flatten_compose(transform_name.transforms)
                 flattened_transforms.extend(flattened_compose)
-                # all_transforms.remove(transform_name)
             else:
                 flattened_transforms.append(transform_name)
         return flattened_transforms
@@ -1202,7 +686,6 @@ def make_common_and_specific_transforms(transform_config):
                 specific_list.append(transform_name)
             elif "ToTensor" in str(transform_name):
                 insert_in_the_beginning.append(transform_name)
-            # elif "to_rgb" in str(transform_name):
             elif is_rgb_convert(transform_name):
                 optional_convert = (
                     lambda x: transform_name(x)
@@ -1222,42 +705,23 @@ def make_common_and_specific_transforms(transform_config):
     specific_transform = copy.deepcopy(transform_config)
 
     if isinstance(transform_config, torchvision.transforms.transforms.Compose):
-        # return transform_config, lambda x: x
         common_list, specific_list = split_in_common_and_specific(
             transform_config.transforms
         )
-
-        # common_transform = copy.deepcopy(transform_config)
-        # specific_transform = copy.deepcopy(transform_config)
         common_transform.transforms = common_list
         specific_transform.transforms = specific_list
 
     else:
         assert isinstance(transform_config, dict)
 
-        # return common_transform, specific_transform
-
-        # common_transform_config = copy.deepcopy(transform_config)
-        # specific_transform_config = copy.deepcopy(transform_config)
         common_list, specific_list = split_in_common_and_specific(
             transform_config["transforms_list"]
         )
         common_transform["transforms_list"] = common_list
         specific_transform["transforms_list"] = specific_list
 
-        # common_transform_config["transforms_list"] = []
-        # for transform_name in transform_config["transforms_list"]:
-        #     if "Normalize" in transform_name:
-        #         # transform_name = transform_name.replace("Random", "Common")
-        #         specific_transform_config["transforms_list"] = [transform_name]
-        #     else:
-        #         common_transform_config["transforms_list"].append(transform_name)
-
         common_transform = make_transforms(common_transform)
         specific_transform = make_transforms(specific_transform)
-
-    # if specific_transform is None:
-    #     specific_transform = lambda x: x
 
     return common_transform, specific_transform
 
@@ -1273,7 +737,6 @@ def make_bboxed_dataset_v2(
     apply_mask,
     filter_keyword,
 ):
-    # transform, mask_transform = make_image_mask_transforms(transform_config)
     common_transform, specific_transform = make_common_and_specific_transforms(
         transform_config
     )
@@ -1291,63 +754,7 @@ def make_bboxed_dataset_v2(
     )
 
 
-def make_bboxed_dataset(
-    base_dataset_config,
-    split_for_base_dataset,
-    transform_config,
-    masks_path,
-    bboxes_folder,
-    mapping_dict_path,
-    mask_per_value_folder,
-    dataset_task="detection",
-    extended_output=False,
-    images_list=None,
-):
-    # mask_transform_config = copy.deepcopy(transform_config)
-    # mask_transform_config["transforms_list"] = [
-    #     transform_name
-    #         for transform_name
-    #             in mask_transform_config["transforms_list"]
-    #                 if not "Normalize" in transform_name
-    # ]
-
-    # transform = make_transforms(transform_config)
-
-    # # masks = load_from_pickle(masks_path)
-    # # masks = masks_path
-
-    # mask_transform = make_transforms(mask_transform_config)
-
-    transform, mask_transform = make_image_mask_transforms(transform_config)
-
-    # make base dataset
-    dataset = get_imagenet_dataset(
-        base_dataset_config,
-        split=split_for_base_dataset,
-        transform=None,
-        num_samples=0,
-        subset_indices=None,
-        reverse_indices=False,
-    )
-
-    bboxed_dataset = ImageNetBBoxAnnotations(
-        base_dataset=dataset,
-        bboxes_folder=bboxes_folder,
-        # masks=masks,
-        masks=masks_path,
-        mapping_dict_path=mapping_dict_path,
-        mask_per_value_folder=mask_per_value_folder,
-        image_transform=transform,
-        mask_transform=mask_transform,
-        dataset_task=dataset_task,
-        extended_output=extended_output,
-        images_list=images_list,
-    )
-    return bboxed_dataset
-
-
 def make_bboxed_dataset_from_config(bboxed_dataset_config, transform_type):
-    # train_transform_config = bboxed_dataset_config.get("train_transform")
     if transform_type == "train":
         train_transform_config = get_with_assert(
             bboxed_dataset_config, "train_transform"
@@ -1367,33 +774,7 @@ def make_bboxed_dataset_from_config(bboxed_dataset_config, transform_type):
 
     csv_path = bboxed_dataset_config.get("csv_path")
     if csv_path is None:
-        base_dataset_config = get_with_assert(
-            bboxed_dataset_config, "base_dataset_config"
-        )
-        split_for_base_dataset = get_with_assert(
-            bboxed_dataset_config, "split_for_base_dataset"
-        )
-        masks_path = get_with_assert(bboxed_dataset_config, "masks_path")
-        bboxes_folder = get_with_assert(bboxed_dataset_config, "bboxes_folder")
-        mapping_dict_path = get_with_assert(
-            bboxed_dataset_config, "mapping_dict_path"
-        )
-        mask_per_value_folder = get_with_assert(
-            bboxed_dataset_config, "mask_per_value_folder"
-        )
-
-        bboxed_dataset = make_bboxed_dataset(
-            base_dataset_config,
-            split_for_base_dataset,
-            transform_config,
-            masks_path,
-            bboxes_folder,
-            mapping_dict_path,
-            mask_per_value_folder,
-            dataset_task=dataset_task,
-            extended_output=extended_output,
-            images_list=images_list,
-        )
+        raise ValueError("csv_path is required")
     else:
         foreground_keyword = bboxed_dataset_config.get("foreground_keyword")
         apply_mask = bboxed_dataset_config.get("apply_mask", True)
@@ -1422,13 +803,11 @@ def get_bboxed_dataloaders(
     train_val_split = get_with_assert(bboxed_dataset_config, "train_val_split")
 
     if train_val_split == 1:
-        # assert eval_batch_size == 0 and train_batch_size > 0
         assert train_batch_size > 0
         eval_batch_size = 0
     elif train_val_split > 0 and train_val_split < 1:
         assert eval_batch_size > 0 and train_batch_size > 0
     if train_val_split == 0:
-        # assert train_batch_size == 0 and eval_batch_size > 0
         assert eval_batch_size > 0
         train_batch_size = 0
 
@@ -1460,15 +839,12 @@ def get_bboxed_dataloaders(
             all_idx,
             test_size=(1 - train_val_split),
             stratify=stratify,
-            # random_state=42
         )
 
         train_dataset = Subset(train_bbox_dataset, train_idx)
         val_dataset = Subset(val_bbox_dataset, val_idx)
 
     loaders = {}
-
-    # dataset_type = "bboxed_dataset"
 
     if train_dataset is not None:
         train_loader = DataLoader(
@@ -1529,6 +905,5 @@ def make_bbox_dl_from_csv(
         dataset,
         batch_size=batch_size,
         shuffle=False,
-        # shuffle=True, # tmp
         num_workers=num_workers,
     )
