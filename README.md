@@ -68,12 +68,12 @@ To plot the ROC-curves for OOD detection, please run all cells in sections `Impo
 If you want to regenerate those scores, you will need to follow the same instructions
 for robust classification results + instructions from ["Compute uncertainty scores"](#compute-uncertainty-scores) (order matters).
 
-To get the qualitative results for HQES from Figure 1 (segmentation of image with bears) or Figure 3 please run all cells in sections `Imports`, `Functions`, `Predict with HQES` (order matters) in jupyter notebook `./notebooks/qualitative_results.ipynb.
+To get the qualitative results for HQES from Figure 1 (segmentation of image with bears) or Figure 3 please run all cells in sections `Imports`, `Functions`, `Predict with HQES` (order matters) in jupyter notebook `./notebooks/qualitative_results.ipynb`.
 
 Please note that results may differ depending on the [CUDA](https://developer.nvidia.com/cuda-toolkit) version, the results above are computed for CUDA 12.2.
 
 Note: Currently we provide only robust classification results.
-Quantitative results for the object discovery (segmentation) experiments are currently not supported because they were computed using the [fork](https://github.com/AlexanderRubinstein/object-centric-learning-framework) of the separate repository. We can add code and commands to reproduce other results by request if there are enough people interested.
+Quantitative results for the object discovery (segmentation) experiments are currently not supported because they were computed using the [fork](https://github.com/AlexanderRubinstein/object-centric-learning-framework) ("train_works" branch) of the separate repository. We can add code and commands to reproduce other results by request if there are enough people interested.
 
 ## Download datasets and checkpoints
 
