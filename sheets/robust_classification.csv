@@ -1,2 +1,0 @@
-path_to_main,path_to_default_config,whether_to_run,slurm:time,delta:exec_path,delta:kwargs/result_path,delta:two_dash_flags,delta:kwargs/dataset_name,delta:kwargs/mask_source,status,run_folder,stdout,stderr,walltime,slurm job id
-__RUNNER__,./configs/runner_config.yaml,0,24:00:00,./scripts/eval_spurious.py,./data/results/eval_spurious/urban_cars.pth,[recompute_all clip],urban_cars,dino_ft,,,,,,
