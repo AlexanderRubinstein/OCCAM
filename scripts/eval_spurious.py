@@ -89,6 +89,11 @@ def get_parser():
         default=None,
         help="filter keyword for filtering masks",
     )
+    parser.add_argument(
+        "--skip_eval",
+        action="store_true",
+        help="skip eval",
+    )
     return parser
 
 
@@ -607,23 +612,24 @@ def main():
         )  # was needed only to compute ens_entropy scores
 
     assert len(parquets) > 0, "No parquets are generated"
-    eval_models(
-        parquets=parquets,
-        models=_models_dict,
-        fg_detectors=fg_detectors + [None],
-        full_res_save_path=args.result_path,
-        batch_size=batch_size,
-        clean_dataloader_kwargs=clean_dataloader_kwargs,  # attention to mappers
-        recompute_all=args.recompute_all,
-        filter_keyword=args.filter_keyword,
-    )
+    if not args.skip_eval:
+        eval_models(
+            parquets=parquets,
+            models=_models_dict,
+            fg_detectors=fg_detectors + [None],
+            full_res_save_path=args.result_path,
+            batch_size=batch_size,
+            clean_dataloader_kwargs=clean_dataloader_kwargs,  # attention to mappers
+            recompute_all=args.recompute_all,
+            filter_keyword=args.filter_keyword,
+        )
 
-    df = convert_to_table(args.result_path, args.dataset_name)
-    pd.set_option(
-        "display.max_colwidth", MAX_COL_WIDTH
-    )  # to see long model names
-    pd.set_option("display.max_rows", MAX_ROWS)  # to see all results
-    print(df)
+        df = convert_to_table(args.result_path, args.dataset_name)
+        pd.set_option(
+            "display.max_colwidth", MAX_COL_WIDTH
+        )  # to see long model names
+        pd.set_option("display.max_rows", MAX_ROWS)  # to see all results
+        print(df)
 
 
 def convert_to_table(result_path, dataset_name):
