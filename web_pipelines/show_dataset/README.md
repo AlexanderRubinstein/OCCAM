@@ -39,8 +39,7 @@ pip install -r requirements.txt
 
 1. **Start the web application**:
 ```bash
-cd web_pipelines/show_dataset
-python app.py --config_path ../../configs/show_dataset/data_config.yaml --path_within_config data/dataset_configs/bboxed_dataset_urban_cars
+python web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/data_config.yaml --path_within_config data/dataset_configs/bboxed_dataset_urban_cars
 ```
 
 2. **Open your web browser** and navigate to `http://localhost:5000`
