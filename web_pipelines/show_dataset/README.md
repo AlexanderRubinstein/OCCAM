@@ -110,10 +110,10 @@ The `data_config.yaml` file defines multiple dataset configurations for the visu
 - **`dataset_task`**: Either "classification" or "detection" - determines which masks are displayed
 - **`label_converter`**: Path to `.pt` file containing class name mappings (or `null` if not needed)
 - **`foreground_keyword`**: Keyword for foreground selection method (e.g., "oracle---clip_openai_ViT-L/14" means using ground truth probability (oracle in paper) of the clip from openai with ViT-L/14 vision encoder)
-- **`filter_keyword`**: Filtering criteria for mask selection. Example: "by_mask_size+by_background+by_num_connected_components" filters masks based on size, image edges coverage, and number of connected components.
+- **`filter_keyword`**: Filtering criteria for mask selection. If masks satisfy this criterion, they will be shown neither for classification nor for the detection task. Example: "by_mask_size+by_background+by_num_connected_components" filters masks based on size, image edges coverage, and number of connected components.
 
 The config includes 6 pre-configured datasets:
-1. **Urban Cars** (`bboxed_dataset_urban_cars`) - StanfordCars on city/rural backgrounds with city/rural co-occuring objects dataset
+1. **Urban Cars** (`bboxed_dataset_urban_cars`) - StanfordCars on city/rural backgrounds with city/rural co-occurring objects dataset
 2. **Waterbirds Group 2** (`bboxed_dataset_wb_group_2`) - Waterbirds on land background
 3. **Waterbirds Group 3** (`bboxed_dataset_wb_group_3`) - Waterbirds on water background
 4. **ImageNet-D** (`bboxed_dataset_in_d`) - ImageNet-D background dataset
