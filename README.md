@@ -155,6 +155,10 @@ export ROOT=./ && export ENV=$ROOT/envs/occam && export PROJECT_ROOT_PROVIDED_FO
 
 Upon a successful scripts completion `sheets/robust_classification.csv` will look like `sheets/robust_classification_filled.csv` and will be ready for steps described in [Reproduce results from the paper](#reproduce-results-from-the-paper).
 
+## Take a look at masks applied to images
+
+To visualize the images with applied masks for robust classification and foreground detection datasets, please see this [README](web_pipelines/show_dataset/README.md).
+
 ## Compute uncertainty scores
 
 In pre-compute scores needed for reproducing the OOD detection results.
