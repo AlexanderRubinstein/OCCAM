@@ -40,17 +40,19 @@ pip install -r requirements.txt
 0. **Prepare file with dataset metadata and image/masks paths**
 You need a parquet file with dataset metadata and image/mask paths for the `csv_path` config parameter, as mentioned in [here](#dataset-config-explanation)
 
-**Generate masks for UrbanCars:**
+**Example: generate masks for UrbanCars with HQES segmentation model:**
 ```bash
 python ./scripts/predict_masks.py --confidence_threshold=0.5 --config_file=./configs/cropformer/cropformer_hornet.yaml --input_folder=./data/datasets/UrbanCars/test --mask_generator_type=cropformer --model_path=./checkpoints/CropFormer_hornet_3x_03823a.pth --output=./data/masks/cropformer/UC_masks.pkl
 ```
 
-**Create metadata file:**
+**Example: create metadata file using clip models to compute foreground detection scores:**
 ```bash
 python ./scripts/eval_spurious.py --dataset_name=urban_cars --filter_keyword=by_mask_size+by_background+by_num_connected_components --mask_source=cropformer --result_path=./data/results/eval_spurious/uc_clip_cropformer.pkl --recompute_all --clip --skip_eval
 ```
 
 This generates `./data/csvs/cropformer/source_urban_cars_by_mask_size+by_background+by_num_connected_components.parquet`.
+
+`--filter_keyword` can control masks filtering as described in [here](#dataset-config-explanation).
 
 1. **Start the web application**:
 ```bash
