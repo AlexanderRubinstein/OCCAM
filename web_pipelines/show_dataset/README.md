@@ -87,7 +87,8 @@ The example image shows 6 views from left to right:
 
 To view background masks (mask class 0) in addition to foreground masks (mask class 1), add the `dataset_task=detection` argument:
 
-```python ./web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/data_config.yaml --path_within_config data/
+```
+python ./web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/data_config.yaml --path_within_config data/
 dataset_configs/bboxed_dataset_urban_cars --data_kwargs dataset_task=detection --split eval
 ```
 
