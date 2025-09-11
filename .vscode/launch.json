@@ -6,6 +6,47 @@
     "configurations": [
 
         {
+            "name": "Eval Spurious: Urban Cars CLIP Cropformer",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "./scripts/eval_spurious.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--dataset_name",
+                "urban_cars",
+                "--filter_keyword",
+                "by_mask_size+by_background+by_num_connected_components",
+                "--mask_source",
+                "cropformer",
+                "--result_path",
+                "./data/results/eval_spurious/uc_clip_cropformer.pkl",
+                "--recompute_all",
+                "--clip",
+                "--skip_eval"
+            ]
+        },
+
+        {
+            "name": "Show Dataset: Urban Cars",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "./web_pipelines/show_dataset/app.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "--config_path",
+                "./configs/show_dataset/data_config.yaml",
+                "--path_within_config",
+                "data/dataset_configs/bboxed_dataset_urban_cars",
+                "--data_kwargs",
+                "dataset_task=detection",
+                "--split",
+                "eval"
+            ]
+        },
+
+        {
             "name": "Python predict_masks.py dino-ft",
             "type": "debugpy",
             "request": "launch",

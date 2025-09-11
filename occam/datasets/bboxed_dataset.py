@@ -30,6 +30,7 @@ from occam.robust_classification.masking import (
     DEFAULT_VISUAL_PROMPT_TYPE,
     apply_visual_prompts,
 )
+
 sys.path.pop(0)
 
 
@@ -86,7 +87,6 @@ def make_bbox(bbox_path, n_channels=3):
 
 
 def compute_bbox_fit_score(mask, bbox, extended_output=False):
-
     mask_shape_len = len(mask.shape)
     assert mask.shape == bbox.shape
     if mask_shape_len == 4:
@@ -279,7 +279,6 @@ class ImageNetBBoxAnnotationsV2(Dataset):
                     return_tuple = (applied_mask, classification_label)
 
         if return_tuple is None:
-
             source_image_path = csv_row.iloc[0]
             classification_label = csv_row.iloc[1]
             image_to_label = csv_row.iloc[2]
@@ -303,7 +302,6 @@ class ImageNetBBoxAnnotationsV2(Dataset):
                 metadata = None
 
             return_tuple = get_return_tuple(
-
                 idx,
                 source_image_path,
                 classification_label,
@@ -482,12 +480,11 @@ def get_return_tuple(
     else:
         # imoprt here, because detectron2 is not installed by default
         from detectron2.data.detection_utils import read_image
+
         image = read_image(
             source_image_path, format="BGR"
         )  # https://github.com/facebookresearch/detectron2/blob/c69939aa85460e8135f40bce908a6cddaa73065f/detectron2/data/detection_utils.py#L166
-        image = image[
-            :, :, ::-1
-        ]
+        image = image[:, :, ::-1]
         image = np.copy(image)  # to avoid warnings about non-writeable arrays
         # image = image / 255 # uint8 -> float32
 
@@ -766,6 +763,8 @@ def make_bboxed_dataset_from_config(bboxed_dataset_config, transform_type):
             bboxed_dataset_config, "eval_transform"
         )
         transform_config = eval_transform_config
+
+    assert transform_config is not None, "transform_config is required"
 
     dataset_task = get_with_assert(bboxed_dataset_config, "dataset_task")
     extended_output = bboxed_dataset_config.get("extended_output", False)

@@ -37,6 +37,21 @@ pip install -r requirements.txt
 
 ### Basic Usage
 
+0. **Prepare file with dataset metadata and image/masks paths**
+You need a parquet file with dataset metadata and image/mask paths for the `csv_path` config parameter, as mentioned in [here](#dataset-config-explanation)
+
+**Generate masks for UrbanCars:**
+```bash
+python ./scripts/predict_masks.py --confidence_threshold=0.5 --config_file=./configs/cropformer/cropformer_hornet.yaml --input_folder=./data/datasets/UrbanCars/test --mask_generator_type=cropformer --model_path=./checkpoints/CropFormer_hornet_3x_03823a.pth --output=./data/masks/cropformer/UC_masks.pkl
+```
+
+**Create metadata file:**
+```bash
+python ./scripts/eval_spurious.py --dataset_name=urban_cars --filter_keyword=by_mask_size+by_background+by_num_connected_components --mask_source=cropformer --result_path=./data/results/eval_spurious/uc_clip_cropformer.pkl --recompute_all --clip --skip_eval
+```
+
+This generates `./data/csvs/cropformer/source_urban_cars_by_mask_size+by_background+by_num_connected_components.parquet`.
+
 1. **Start the web application**:
 ```bash
 python web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/data_config.yaml --path_within_config data/dataset_configs/bboxed_dataset_urban_cars
@@ -46,7 +61,62 @@ python web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/da
 
 3. **View the dataset samples** - The interface will display random samples from your dataset
 
+For the example commands above you should see the following samples from [UrbanCars](https://openaccess.thecvf.com/content/CVPR2023/supplemental/Li_A_Whac-a-Mole_Dilemma_CVPR_2023_supplemental.pdf) dataset:
+
+![Urban Cars Dataset Sample](static/demo_images/uc_sampled_example_classification.jpeg)
+
+The example image shows 6 views from left to right:
+
+1. Original image with filename and label (e.g. "city car on city background")
+
+2. Foreground mask with highest foreground score. It's class will always be 1 - foreground. Below we will also show how to look at masks that are predicted as class 0 - background.
+
+3. Applied mask on gray background, used in experiments. Includes metadata:
+   - foreground_score: foreground selection score (in the example we use oracle foreground selection which is the same ground truth probability)
+   - gt_class: Ground truth class label (e.g. 0 for city car)
+   - gt_prob: Ground truth class probability
+   - max_prob: Highest class probability (in the example it coincides with gt_prob because foreground detector predicts ground truth class)
+
+4. Bounding box of foreground object (if available, otherwise full image box)
+
+5. All detected masks from mask generator
+
+6. Overlay of mask and bounding box (intersection in yellow), useful for IoU-based foreground selection
+
+To view background masks (mask class 0) in addition to foreground masks (mask class 1), add the `dataset_task=detection` argument:
+
+```python ./web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/data_config.yaml --path_within_config data/
+dataset_configs/bboxed_dataset_urban_cars --data_kwargs dataset_task=detection --split eval
+```
+
+You will see examples like this one:
+
+![Urban Cars Dataset Sample](static/demo_images/uc_sampled_example_detection.jpeg)
+
 4. **Generate new samples** - Click the "Sample Other Images" button to get new random samples
+
+### Dataset config explanation:
+
+The `data_config.yaml` file defines multiple dataset configurations for the visualization tool. Each dataset configuration includes the following key parameters:
+
+- **`train_transform`**: Image transforms applied during training (typically `null` for visualization)
+- **`eval_transform`**: Image transforms for evaluation/visualization, including:
+  - `ToTensor`: Converts images to PyTorch tensors
+  - `Normalize`: Standard ImageNet normalization (mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225])
+- **`train_val_split`**: Fraction of data used for training (0.0 means all data used for evaluation)
+- **`csv_path`**: Path to the csv or parquet file containing dataset metadata and image paths
+- **`dataset_task`**: Either "classification" or "detection" - determines which masks are displayed
+- **`label_converter`**: Path to `.pt` file containing class name mappings (or `null` if not needed)
+- **`foreground_keyword`**: Keyword for foreground selection method (e.g., "oracle---clip_openai_ViT-L/14" means using ground truth probability (oracle in paper) of the clip from openai with ViT-L/14 vision encoder)
+- **`filter_keyword`**: Filtering criteria for mask selection. Example: "by_mask_size+by_background+by_num_connected_components" filters masks based on size, image edges coverage, and number of connected components.
+
+The config includes 6 pre-configured datasets:
+1. **Urban Cars** (`bboxed_dataset_urban_cars`) - StanfordCars on city/rural backgrounds with city/rural co-occuring objects dataset
+2. **Waterbirds Group 2** (`bboxed_dataset_wb_group_2`) - Waterbirds on land background
+3. **Waterbirds Group 3** (`bboxed_dataset_wb_group_3`) - Waterbirds on water background
+4. **ImageNet-D** (`bboxed_dataset_in_d`) - ImageNet-D background dataset
+5. **ImageNet-9** (`bboxed_dataset_in_9`) - ImageNet-9 mixed dataset
+6. **Counter Animal** (`bboxed_dataset_counter`) - Counter animal dataset
 
 ### Advanced Usage
 

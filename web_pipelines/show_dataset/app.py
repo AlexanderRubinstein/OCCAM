@@ -84,9 +84,8 @@ def parse_args():
     parser.add_argument(
         "--split",
         type=str,
-        required=False,
+        required=True,
         help="data split to show",
-        default="train",
     )
     parser.add_argument(
         "--n_images", type=int, help="Number of images to show", default=10
@@ -151,6 +150,9 @@ def sample_images_from_dataset():
     # when dataset has not been created yet, creation args are stored in DATASET
     if isinstance(DATASET, tuple):
         dataset_config, split, logger = DATASET
+        assert (
+            dataset_config.get("foreground_keyword") is not None
+        ), "foreground_keyword is required"
         DATASET = make_dataset(dataset_config, split, logger)
         label_converter = dataset_config.get("label_converter", None)
         if label_converter is not None:
@@ -312,9 +314,7 @@ def show_bbox_image(axes, item, label_converter=None, mode=None):
             if len(all_masks.shape) == 2:
                 all_masks = all_masks[None, ...]
                 all_masks = np.concatenate([all_masks] * 3, axis=0)
-            all_masks = (
-                all_masks / all_masks.max()
-            )
+            all_masks = all_masks / all_masks.max()
             image_caption_list.append(
                 (tensor_for_matplotlib(all_masks), f"All masks")
             )
@@ -372,9 +372,7 @@ def show_bbox_image(axes, item, label_converter=None, mode=None):
             if len(all_masks.shape) == 2:
                 all_masks = all_masks[None, ...]
                 all_masks = np.concatenate([all_masks] * 3, axis=0)
-            all_masks = (
-                all_masks / all_masks.max()
-            )
+            all_masks = all_masks / all_masks.max()
             image_caption_list.append(
                 (tensor_for_matplotlib(all_masks), f"All masks")
             )
