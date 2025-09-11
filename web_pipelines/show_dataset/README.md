@@ -8,7 +8,7 @@ A web-based visualization tool for exploring images with segmentation masks and 
 - **Multi-View Visualization**: Display original images, segmentation masks, bounding boxes, and applied masks
 - **Metadata Display**: Show classification labels, predictions, and other relevant metadata
 - **Random Sampling**: Generate new random samples from the dataset with a single click
-- **Multiple Dataset Support**: Compatible with various datasets including Urban Cars, Waterbirds, ImageNet-D, ImageNet-9, and Counter Animal datasets
+- **Multiple Dataset Support**: Compatible with various datasets including [Urban Cars](https://arxiv.org/abs/2212.04825), [Waterbirds](https://arxiv.org/abs/1911.08731), [ImageNet-D](https://arxiv.org/abs/2403.18775), [ImageNet-9](https://arxiv.org/abs/2006.09994), and [Counter Animal](https://arxiv.org/abs/2403.11497) datasets
 - **Flexible Configuration**: Support for custom dataset configurations and parameters
 
 ## Prerequisites
@@ -40,7 +40,7 @@ pip install -r requirements.txt
 0. **Prepare file with dataset metadata and image/masks paths**
 You need a parquet file with dataset metadata and image/mask paths for the `csv_path` config parameter, as mentioned in [here](#dataset-config-explanation)
 
-**Example: generate masks for UrbanCars with HQES segmentation model:**
+**Example: generate masks for UrbanCars with [HQES](https://arxiv.org/abs/2211.05776) segmentation model:**
 ```bash
 python ./scripts/predict_masks.py --confidence_threshold=0.5 --config_file=./configs/cropformer/cropformer_hornet.yaml --input_folder=./data/datasets/UrbanCars/test --mask_generator_type=cropformer --model_path=./checkpoints/CropFormer_hornet_3x_03823a.pth --output=./data/masks/cropformer/UC_masks.pkl
 ```
