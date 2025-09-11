@@ -10,6 +10,7 @@ slurm_outputs
 *.lock
 experiment_configs
 not_sync
+.DS_Store
 
 
 # Byte-compiled / optimized / DLL files

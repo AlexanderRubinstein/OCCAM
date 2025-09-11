@@ -23,6 +23,8 @@ To create and activate a conda environment with `Python 3.10.0` run the followin
 ```
 mkdir ./envs && conda create --yes --prefix ./envs/occam python==3.10.0
 conda activate ./envs/occam/
+git submodule update --init --recursive
+git submodule update --remote
 pip install -r requirements.txt
 
 # the commands below are needed only if you plan to generate masks with HQES.

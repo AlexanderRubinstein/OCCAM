@@ -22,7 +22,9 @@ try:
     from detectron2.projects.deeplab import add_deeplab_config
 
     # local imports
-    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+    sys.path.insert(
+        0, os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    )
     sys.path.insert(
         0, (os.path.dirname(os.path.dirname(__file__)))
     )  # to allow importing from get_segments directly
@@ -33,6 +35,7 @@ try:
         EntityCrop,
         EntityCropTransform,
     )
+
     sys.path.pop(0)
     sys.path.pop(0)
 
@@ -57,6 +60,19 @@ try:
             cfg.merge_from_file(args.config_file)
             cfg.merge_from_list(args.opts)
             cfg.freeze()
+            # Ensure CropFormer and related components are registered in Detectron2's registries
+            # before building the model. This import registers the 'CropFormer' META_ARCH.
+            try:
+                sys.path.insert(
+                    0, (os.path.dirname(os.path.dirname(__file__)))
+                )  # to allow importing from get_segments directly
+                import occam.get_segments.cropformer_model  # noqa: F401
+
+                sys.path.pop(0)
+            except Exception as e:
+                raise ImportError(
+                    f"Failed to import occam.get_segments.cropformer_model required to register 'CropFormer': {e}"
+                )
             super().__init__(cfg)
             self.model = self.model.cuda()
             self.metadata = MetadataCatalog.get(
@@ -161,9 +177,13 @@ try:
                         if i < range[0]:
                             continue
                     filename = filename[0]
-                    inputs["image"], inputs["image_crop"] = inputs["image"].squeeze(
+                    inputs["image"], inputs["image_crop"] = inputs[
+                        "image"
+                    ].squeeze(0).cuda(non_blocking=True), inputs[
+                        "image_crop"
+                    ].squeeze(
                         0
-                    ).cuda(non_blocking=True), inputs["image_crop"].squeeze(0).cuda(
+                    ).cuda(
                         non_blocking=True
                     )
                     predictions = self.model([inputs])[0]
@@ -189,7 +209,6 @@ try:
                     }
             return mega_dict
 
-
     class EntitySegDecoder(torch.nn.Module):
         def __init__(
             self, config_path: str, opts: List[str], confidence_threshold: float
@@ -212,6 +231,7 @@ try:
                 0, (os.path.dirname(os.path.dirname(__file__)))
             )  # to allow importing from get_segments directly
             import occam.get_segments.cropformer_model
+
             sys.path.pop(0)
 
             self.entity_net = EntityNetV2(args=args, store_dataloader=False)
@@ -247,9 +267,9 @@ try:
                 ranks = ranks + 1
 
                 for index in ranks:
-                    mask_id[(selected_masks[index - 1] == 1).cpu().numpy()] = int(
-                        index
-                    )
+                    mask_id[
+                        (selected_masks[index - 1] == 1).cpu().numpy()
+                    ] = int(index)
 
             return mask_id
 
@@ -266,5 +286,3 @@ except ImportError:
             raise ImportError(
                 "detectron2 is not installed. Please install it using the following command: pip install 'git+https://github.com/facebookresearch/detectron2.git'"
             )
-
-
