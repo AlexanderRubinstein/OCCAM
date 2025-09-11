@@ -56,7 +56,7 @@ This generates `./data/csvs/cropformer/source_urban_cars_by_mask_size+by_backgro
 
 1. **Start the web application**:
 ```bash
-python web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/data_config.yaml --path_within_config data/dataset_configs/bboxed_dataset_urban_cars
+python ./web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/data_config.yaml --path_within_config data/dataset_configs/bboxed_dataset_urban_cars
 ```
 
 2. **Open your web browser** and navigate to `http://localhost:5000`
@@ -125,7 +125,7 @@ The config includes 6 pre-configured datasets:
 #### Command Line Options
 
 ```bash
-python web_pipelines/show_dataset/app.py --help
+python ./web_pipelines/show_dataset/app.py --help
 ```
 
 **Required Arguments:**
@@ -143,22 +143,22 @@ python web_pipelines/show_dataset/app.py --help
 
 **View Urban Cars dataset:**
 ```bash
-python web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/data_config.yaml --path_within_config data/dataset_configs/bboxed_dataset_urban_cars
+python ./web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/data_config.yaml --path_within_config data/dataset_configs/bboxed_dataset_urban_cars
 ```
 
 **View specific number of images:**
 ```bash
-python web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/data_config.yaml --n_images 20
+python ./web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/data_config.yaml --n_images 20
 ```
 
 **View specific images:**
 ```bash
-python web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/data_config.yaml --images_list "image1.jpg,image2.jpg,image3.jpg"
+python ./web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/data_config.yaml --images_list "image1.jpg,image2.jpg,image3.jpg"
 ```
 
 **View with custom parameters:**
 ```bash
-python web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/data_config.yaml --data_kwargs "visualization_mode=unicorn;extended_output=true"
+python ./web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/data_config.yaml --data_kwargs "visualization_mode=unicorn;extended_output=true"
 ```
 
 ## Configuration
@@ -245,7 +245,7 @@ web_pipelines/show_dataset/
 
 Run with `--debug` flag to enable Flask's debug mode:
 ```bash
-python web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/data_config.yaml --debug
+python ./web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/data_config.yaml --debug
 ```
 
 ## Technical Details
