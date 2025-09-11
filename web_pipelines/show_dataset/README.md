@@ -61,7 +61,7 @@ python web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/da
 
 3. **View the dataset samples** - The interface will display random samples from your dataset
 
-For the example commands above you should see the following samples from [UrbanCars](https://openaccess.thecvf.com/content/CVPR2023/supplemental/Li_A_Whac-a-Mole_Dilemma_CVPR_2023_supplemental.pdf) dataset:
+For the example commands shown in step 0. you should see the following samples from [UrbanCars](https://openaccess.thecvf.com/content/CVPR2023/supplemental/Li_A_Whac-a-Mole_Dilemma_CVPR_2023_supplemental.pdf) dataset:
 
 ![Urban Cars Dataset Sample](static/demo_images/uc_sampled_example_classification.jpeg)
 
@@ -93,7 +93,7 @@ You will see examples like this one:
 
 ![Urban Cars Dataset Sample](static/demo_images/uc_sampled_example_detection.jpeg)
 
-4. **Generate new samples** - Click the "Sample Other Images" button to get new random samples
+4. **Generate new samples** - Click the "Sample Other Images" button to get new random samples (image sampling can take up to 30 seconds if it is the first time you push the button)
 
 ### Dataset config explanation:
 
@@ -123,7 +123,7 @@ The config includes 6 pre-configured datasets:
 #### Command Line Options
 
 ```bash
-python app.py --help
+python web_pipelines/show_dataset/app.py --help
 ```
 
 **Required Arguments:**
@@ -141,22 +141,22 @@ python app.py --help
 
 **View Urban Cars dataset:**
 ```bash
-python app.py --config_path ../../configs/show_dataset/data_config.yaml --path_within_config data/dataset_configs/bboxed_dataset_urban_cars
+python web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/data_config.yaml --path_within_config data/dataset_configs/bboxed_dataset_urban_cars
 ```
 
 **View specific number of images:**
 ```bash
-python app.py --config_path ../../configs/show_dataset/data_config.yaml --n_images 20
+python web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/data_config.yaml --n_images 20
 ```
 
 **View specific images:**
 ```bash
-python app.py --config_path ../../configs/show_dataset/data_config.yaml --images_list "image1.jpg,image2.jpg,image3.jpg"
+python web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/data_config.yaml --images_list "image1.jpg,image2.jpg,image3.jpg"
 ```
 
 **View with custom parameters:**
 ```bash
-python app.py --config_path ../../configs/show_dataset/data_config.yaml --data_kwargs "visualization_mode=unicorn;extended_output=true"
+python web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/data_config.yaml --data_kwargs "visualization_mode=unicorn;extended_output=true"
 ```
 
 ## Configuration
@@ -168,8 +168,7 @@ The tool uses YAML configuration files to define datasets. Each dataset configur
 ```yaml
 dataset_name:
   train_transform: null
-  eval_transform:
-  # Transform configuration
+  eval_transform: <...> # Transform configuration
   train_val_split: 0.0
   csv_path: "./path/to/dataset.parquet"
   dataset_task: "classification"
@@ -244,7 +243,7 @@ web_pipelines/show_dataset/
 
 Run with `--debug` flag to enable Flask's debug mode:
 ```bash
-python app.py --config_path ../../configs/show_dataset/data_config.yaml --debug
+python web_pipelines/show_dataset/app.py --config_path ./configs/show_dataset/data_config.yaml --debug
 ```
 
 ## Technical Details
