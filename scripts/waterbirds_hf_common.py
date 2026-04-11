@@ -54,8 +54,8 @@ def extract_waterbirds_from_uc_wb_ca_tar(
     Google Drive archive into dest_waterbirds_root.
 
     The archive uses legacy paths (``test_split/group_*``, ``FG-Only/test_split/group_*``);
-    this rewrites them in-place to the Hub viewer layout (``FG_plus_BG/``, ``FG/``,
-    named group folders).
+    this rewrites them in-place to eight top-level subscenario folders (e.g.
+    ``landbird_on_land``, ``landbird_on_land_fg_only``, …).
     """
     os.makedirs(dest_waterbirds_root, exist_ok=True)
     with tarfile.open(tar_path, "r:*") as tf:
@@ -160,9 +160,9 @@ def compare_waterbirds_trees(
 
 def prepare_tree_for_compare(waterbirds_root: str) -> tuple[str, Optional[str]]:
     """
-    If ``waterbirds_root`` uses legacy layout, copy into a temp dir in Hub layout and
-    return ``(temp_path, temp_path)`` so the caller can ``shutil.rmtree`` the second
-    value. Otherwise return ``(waterbirds_root, None)``.
+    If ``waterbirds_root`` is already the eight-folder Hub layout, return it unchanged.
+    Otherwise copy into a temp dir in that layout (legacy or ``FG_plus_BG``/``FG`` split)
+    and return ``(temp_path, temp_path)`` for cleanup.
     """
     import tempfile
 
@@ -172,8 +172,9 @@ def prepare_tree_for_compare(waterbirds_root: str) -> tuple[str, Optional[str]]:
     )
 
     root = os.path.abspath(waterbirds_root)
-    if detect_layout(root) == "hub":
+    kind = detect_layout(root)
+    if kind == "hub":
         return root, None
-    tmp = tempfile.mkdtemp(prefix="waterbirds_compare_legacy_")
-    materialize_hub_layout_copy(root, tmp, layout="legacy")
+    tmp = tempfile.mkdtemp(prefix="waterbirds_compare_")
+    materialize_hub_layout_copy(root, tmp, layout=kind)
     return tmp, tmp

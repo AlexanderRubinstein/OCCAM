@@ -7,8 +7,8 @@ Downloads the tar (unless --tar-path), extracts only the Waterbirds subtree,
 downloads the HF snapshot into a temporary directory, then compares SHA-256 per file.
 README.md and other Hub-only root files are ignored on the HF side.
 
-Legacy folders (``test_split/``) are normalized to the Hub layout (``FG_plus_BG/``,
-``FG/``) in a temp copy when comparing user-supplied paths, without mutating
+Legacy folders (``test_split/``) or older ``FG_plus_BG``/``FG`` splits are normalized
+to the eight-folder subscenario Hub layout in a temp copy when needed, without mutating
 the originals.
 """
 
