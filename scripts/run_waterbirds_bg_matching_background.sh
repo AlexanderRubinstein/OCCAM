@@ -13,16 +13,20 @@ usage() {
   printf '%s\n' \
     "Run match_waterbirds_bg_only_to_full_siglip.py in the background; logs to matching_logs.log." \
     "" \
-    "Usage: $(basename "$0") [-e DIR | -p PATH]" \
+    "Usage: $(basename "$0") [-e DIR | -p PATH] [--exact-pixel] [--class 0|1]" \
     "  -e, --venv DIR     Virtualenv root (runs DIR/bin/python)" \
     "  -p, --python PATH  Python interpreter to use" \
+    "  --exact-pixel      Forward to Python (pixel-then-SigLIP matching)" \
+    "  --class N          Forward to Python; N is 0 or 1 (one coarse label only)" \
     "  -h, --help         Show this help" \
     "" \
     "If -e / -p are omitted, uses PYTHON, OCCAM_PYTHON, or repo env heuristics." \
+    "Env: EXACT_PIXEL=1 adds --exact-pixel; MATCHING_CLASS=0|1 adds --class (if not on CLI)." \
     "Requires package: open_clip_torch (pip install open_clip_torch)." >&2
 }
 
 EXPLICIT_PYTHON=""
+EXTRA_ARGS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -p | --python)
@@ -44,6 +48,25 @@ while [[ $# -gt 0 ]]; do
     -h | --help)
       usage
       exit 0
+      ;;
+    --exact-pixel)
+      EXTRA_ARGS+=(--exact-pixel)
+      shift
+      ;;
+    --class)
+      [[ -n "${2:-}" ]] || {
+        printf '%s\n' "ERROR: --class requires 0 or 1" >&2
+        exit 1
+      }
+      case "$2" in
+        0 | 1) ;;
+        *)
+          printf '%s\n' "ERROR: --class must be 0 or 1" >&2
+          exit 1
+          ;;
+      esac
+      EXTRA_ARGS+=(--class "$2")
+      shift 2
       ;;
     --)
       shift
@@ -71,9 +94,26 @@ LOG="${MATCHING_LOG:-$ROOT/matching_logs.log}"
 WB_ROOT="${WATERBIRDS_ROOT:-data/datasets/Waterbirds}"
 OUT_JSON="${MATCHING_OUTPUT:-data/datasets/Waterbirds/bg_only_to_full_siglip.json}"
 PID_FILE="${MATCHING_PID_FILE:-$ROOT/matching_logs.pid}"
-EXTRA_ARGS=()
-if [[ "${EXACT_PIXEL:-0}" == "1" ]]; then
+
+_have_extra() {
+  local needle="$1"
+  local x
+  for x in "${EXTRA_ARGS[@]}"; do
+    [[ "$x" == "$needle" ]] && return 0
+  done
+  return 1
+}
+if [[ "${EXACT_PIXEL:-0}" == "1" ]] && ! _have_extra --exact-pixel; then
   EXTRA_ARGS+=(--exact-pixel)
+fi
+if [[ -n "${MATCHING_CLASS:-}" ]] && ! _have_extra --class; then
+  case "$MATCHING_CLASS" in
+    0 | 1) EXTRA_ARGS+=(--class "$MATCHING_CLASS") ;;
+    *)
+      printf '%s\n' "ERROR: MATCHING_CLASS must be 0 or 1 (got ${MATCHING_CLASS})" >&2
+      exit 1
+      ;;
+  esac
 fi
 
 log() {
@@ -115,7 +155,7 @@ fi
   echo "Interpreter: $PYTHON ($("$PYTHON" -c 'import sys; print(sys.version.split()[0])' 2>/dev/null || echo 'version?'))"
   echo "Command: $PYTHON scripts/match_waterbirds_bg_only_to_full_siglip.py \\"
   echo "  --waterbirds-root $WB_ROOT \\"
-  echo "  --output $OUT_JSON ${EXTRA_ARGS[@]}"
+  echo "  --output $OUT_JSON ${EXTRA_ARGS[*]}"
 } >>"$LOG"
 
 log "Preflight: testing import open_clip + occam …"
@@ -138,7 +178,7 @@ log "Preflight OK. Starting background worker…"
   PYTHONUNBUFFERED=1 "$PYTHON" scripts/match_waterbirds_bg_only_to_full_siglip.py \
     --waterbirds-root "$WB_ROOT" \
     --output "$OUT_JSON" \
-    ${EXTRA_ARGS[@]}
+    "${EXTRA_ARGS[@]}"
   ec=$?
   echo "---- worker end $(date -Iseconds 2>/dev/null || date) exit_code=$ec ----"
   exit "$ec"

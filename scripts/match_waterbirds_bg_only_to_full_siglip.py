@@ -18,6 +18,9 @@ Example:
 
   # Prefer pixel-identical backgrounds (after resizing full to bg size), then SigLIP tie-break:
   python scripts/match_waterbirds_bg_only_to_full_siglip.py ... --exact-pixel
+
+  # Only landbird (label 1) folders:
+  python scripts/match_waterbirds_bg_only_to_full_siglip.py ... --class 1
 """
 
 from __future__ import annotations
@@ -28,7 +31,7 @@ import json
 import os
 import sys
 from collections import defaultdict
-from typing import Dict, List, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -204,6 +207,7 @@ def run_matching(
     use_amp: bool,
     min_margin: float | None,
     exact_pixel: bool,
+    class_label: Optional[str],
 ) -> Tuple[List[dict], dict]:
     waterbirds_root = os.path.abspath(waterbirds_root)
     amp_dtype = torch.float16 if use_amp and device.type == "cuda" else None
@@ -221,12 +225,17 @@ def run_matching(
         "pretrained": pretrained,
         "groups": GROUP_SUBDIRS,
         "exact_pixel_primary_sort": exact_pixel,
+        "class_filter": class_label,
     }
+
+    labels: Tuple[str, ...] = (
+        (class_label,) if class_label in ("0", "1") else ("0", "1")
+    )
 
     for gid, group_name in enumerate(GROUP_SUBDIRS):
         full_root = path_with_background(waterbirds_root, gid)
         bg_root = path_background_only(waterbirds_root, gid)
-        for label in ("0", "1"):
+        for label in labels:
             full_dir = os.path.join(full_root, label)
             bg_dir = os.path.join(bg_root, label)
             if not os.path.isdir(full_dir) or not os.path.isdir(bg_dir):
@@ -410,6 +419,17 @@ def main() -> None:
             "when backgrounds align. Adds field exact_pixel_matches to each row."
         ),
     )
+    parser.add_argument(
+        "--class",
+        dest="class_label",
+        choices=("0", "1"),
+        default=None,
+        metavar="N",
+        help=(
+            "Run matching only for coarse label folder N: 0=waterbird, 1=landbird "
+            "(default: both)."
+        ),
+    )
     args = parser.parse_args()
 
     device = torch.device(args.device)
@@ -423,6 +443,7 @@ def main() -> None:
         use_amp=not args.no_amp,
         min_margin=args.min_best_minus_second,
         exact_pixel=args.exact_pixel,
+        class_label=args.class_label,
     )
 
     if args.min_best_minus_second is not None:
