@@ -79,13 +79,13 @@ Quantitative results for the object discovery (segmentation) experiments are cur
 
 ## Download datasets and checkpoints
 
-To download the datasets (~6GB) and model checkpoints (~2GB) needed for evaluation please run the following command (see ["Folder structure"](#folder-structure) for details of the resulting folders structure):
+To download the datasets (6GB) and model checkpoints (2GB) needed for evaluation please run the following command (see ["Folder structure"](#folder-structure) for details of the resulting folders structure):
 
 ```
 python scripts/download_datasets_and_checkpoints.py
 ```
 
-Note: [ImageNet Validation](https://arxiv.org/abs/1409.0575) set is not downloaded automatically by the script above as it is too big, therefore you should manually download it (e.g. [from Kaggle](https://www.kaggle.com/code/joaoparana/download-imagenet-validation-set)) or symlink it to `data/datasets/ImageNet-val`.
+Note: [ImageNet Validation](https://arxiv.org/abs/1409.0575) set is not downloaded automatically by the script above as it is too big, therefore you should manually download it (e.g. [from Kaggle](https://www.kaggle.com/code/joaoparana/download-imagenet-validation-set)) or symlink it to `data/datasets/ImageNet-val`. **Waterbirds** are sourced from this [Hugging Face dataset](https://huggingface.co/datasets/arubique/waterbirds), which we uploaded with permission from the original authors.
 
 ### Folder structure
 

@@ -12,6 +12,7 @@ git+https://github.com/openai/CLIP.git
 # ./occam/submodules/oclf
 
 # from PyPi
+huggingface_hub>=0.20.0
 gdown==4.6.0 # for newer versions of gdown get "too many requests" error
 loralib
 pre-commit

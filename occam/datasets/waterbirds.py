@@ -15,19 +15,21 @@ from occam.datasets.utils import (
     make_model_classes_wrapper,
     torch_max_func,
 )
+from occam.datasets.waterbirds_layout import (
+    path_foreground_only,
+    path_with_background,
+)
 
 sys.path.pop(0)
 
 
 WATERBIRDS_BASE_PATH = os.path.join(DATASETS_PATH, "Waterbirds")
 WATERBIRDS_PATHS = [
-    os.path.join(WATERBIRDS_BASE_PATH, "test_split", f"group_{group_id}")
+    path_with_background(WATERBIRDS_BASE_PATH, group_id)
     for group_id in range(4)
 ]
 WATERBIRDS_ONLY_FG_PATHS = [
-    os.path.join(
-        WATERBIRDS_BASE_PATH, "FG-Only", "test_split", f"group_{group_id}"
-    )
+    path_foreground_only(WATERBIRDS_BASE_PATH, group_id)
     for group_id in range(4)
 ]
 

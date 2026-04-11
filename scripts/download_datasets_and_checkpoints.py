@@ -21,6 +21,11 @@ from stuned.utility.utils import (
     download_file,
 )
 
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SCRIPT_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPT_DIR)
+import waterbirds_hf_common
+
 
 IMAGENET_D_URL = (
     "https://drive.google.com/uc?id=11zTXmg5yNjZwi8bwc541M1h5tPAVGeQc"
@@ -49,7 +54,32 @@ OOD_RESULTS_URL = (
 BBOXES_URL = "https://drive.google.com/uc?id=1mcH4bximxJ0cEz44PhgNarwlrLMr0_6A"
 
 
-def download_datasets(datasets_folder, ignore_image_net_val):
+def _ensure_waterbirds_from_huggingface(
+    datasets_folder, hf_repo_id=None, hf_token=None
+):
+    """
+    Populate data/datasets/Waterbirds from a Hugging Face dataset snapshot.
+    """
+    waterbirds_path = os.path.join(datasets_folder, "Waterbirds")
+    if os.path.isdir(waterbirds_path):
+        return
+    print(
+        "Downloading Waterbirds from Hugging Face "
+        f"({hf_repo_id or waterbirds_hf_common.default_hf_repo_id()})"
+    )
+    waterbirds_hf_common.download_waterbirds_snapshot(
+        waterbirds_path,
+        repo_id=hf_repo_id,
+        token=hf_token,
+    )
+
+
+def download_datasets(
+    datasets_folder,
+    ignore_image_net_val,
+    waterbirds_hf_repo=None,
+    waterbirds_hf_token=None,
+):
     """
     download datasets
     datasets_folder: path to the datasets folder
@@ -63,8 +93,23 @@ def download_datasets(datasets_folder, ignore_image_net_val):
         assert not os.path.exists(
             os.path.join(datasets_folder, "CounterAnimals")
         ), "CounterAnimals already exists while UrbanCars is missing, please delete CounterAnimals and try again"
-        print("Downloading UrbanCars, Waterbirds, CounterAnimals")
+        print(
+            "Downloading UrbanCars, Waterbirds, CounterAnimals (Google Drive tar)"
+        )
         download_and_extract_tar(DATA_PATH, UC_WB_CA_URL, extension=".tar")
+        wb_tar = os.path.join(datasets_folder, "Waterbirds")
+        if os.path.isdir(wb_tar):
+            print(
+                "Removing Waterbirds from the Google Drive bundle; "
+                "replacing with Hugging Face snapshot"
+            )
+            remove_file_or_folder(wb_tar)
+
+    _ensure_waterbirds_from_huggingface(
+        datasets_folder,
+        hf_repo_id=waterbirds_hf_repo,
+        hf_token=waterbirds_hf_token,
+    )
 
     if not ignore_image_net_val:
         # ImageNet validation
@@ -162,9 +207,28 @@ def main():
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("--ignore_image_net_val", action="store_true")
+    parser.add_argument(
+        "--waterbirds-hf-repo",
+        default=None,
+        help=(
+            "Hugging Face dataset id for Waterbirds "
+            "(default: env OCCAM_WATERBIRDS_HF_DATASET or "
+            "AlexanderRubinstein/OCCAM-Waterbirds)"
+        ),
+    )
+    parser.add_argument(
+        "--waterbirds-hf-token",
+        default=None,
+        help="HF token for private datasets (default: huggingface-cli login / HF_TOKEN env)",
+    )
     args = parser.parse_args()
 
-    download_datasets(DATASETS_FOLDER, args.ignore_image_net_val)
+    download_datasets(
+        DATASETS_FOLDER,
+        args.ignore_image_net_val,
+        waterbirds_hf_repo=args.waterbirds_hf_repo,
+        waterbirds_hf_token=args.waterbirds_hf_token,
+    )
     download_checkpoints(CHECKPOINTS_FOLDER)
 
 
