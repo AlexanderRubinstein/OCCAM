@@ -15,6 +15,9 @@ Example:
   python scripts/match_waterbirds_bg_only_to_full_siglip.py \\
     --waterbirds-root data/datasets/Waterbirds \\
     --output data/datasets/Waterbirds/bg_only_to_full_siglip.json
+
+  # Prefer pixel-identical backgrounds (after resizing full to bg size), then SigLIP tie-break:
+  python scripts/match_waterbirds_bg_only_to_full_siglip.py ... --exact-pixel
 """
 
 from __future__ import annotations
@@ -26,6 +29,8 @@ import os
 import sys
 from collections import defaultdict
 from typing import Dict, List, Sequence, Tuple
+
+import numpy as np
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.dirname(_SCRIPT_DIR)
@@ -57,6 +62,11 @@ from tqdm import tqdm
 
 
 _IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif")
+
+try:
+    _RESAMPLE = Image.Resampling.LANCZOS  # Pillow >= 9
+except AttributeError:  # pragma: no cover
+    _RESAMPLE = Image.LANCZOS  # type: ignore[attr-defined]
 
 
 def _is_image_file(name: str) -> bool:
@@ -113,6 +123,26 @@ def embed_image_paths(
     if not out_chunks:
         return torch.empty(0, 0)
     return torch.cat(out_chunks, dim=0)
+
+
+def _exact_pixel_match_counts(
+    bg_rgb: np.ndarray, full_paths: Sequence[str]
+) -> np.ndarray:
+    """
+    For one bg image ``bg_rgb`` (H, W, 3) uint8, return per-full-image counts of pixels
+    where the full image (resized to H×W) equals ``bg_rgb`` on all three channels.
+    """
+    h, w = bg_rgb.shape[:2]
+    counts = np.zeros(len(full_paths), dtype=np.int64)
+    for i, fp in enumerate(full_paths):
+        with Image.open(fp) as im:
+            full = np.asarray(im.convert("RGB"), dtype=np.uint8)
+        if full.shape[0] != h or full.shape[1] != w:
+            full = np.asarray(
+                Image.fromarray(full).resize((w, h), _RESAMPLE), dtype=np.uint8
+            )
+        counts[i] = int(np.all(full == bg_rgb, axis=-1).sum())
+    return counts
 
 
 def _match_bg_to_full(
@@ -173,6 +203,7 @@ def run_matching(
     device: torch.device,
     use_amp: bool,
     min_margin: float | None,
+    exact_pixel: bool,
 ) -> Tuple[List[dict], dict]:
     waterbirds_root = os.path.abspath(waterbirds_root)
     amp_dtype = torch.float16 if use_amp and device.type == "cuda" else None
@@ -189,6 +220,7 @@ def run_matching(
         "model_id": model_id,
         "pretrained": pretrained,
         "groups": GROUP_SUBDIRS,
+        "exact_pixel_primary_sort": exact_pixel,
     }
 
     for gid, group_name in enumerate(GROUP_SUBDIRS):
@@ -221,31 +253,73 @@ def run_matching(
                 amp_dtype=amp_dtype,
             )
 
-            best_idx, best_sim = _match_bg_to_full(
-                E_bg, E_full, chunk=matmul_chunk, device=device
-            )
-            margin = None
-            if min_margin is not None:
-                margin = _second_best_margin(
-                    E_bg,
-                    E_full,
-                    chunk=matmul_chunk,
-                    device=device,
+            if exact_pixel:
+                cos_all = (E_bg @ E_full.t()).cpu().numpy()
+                margin = None
+                if min_margin is not None:
+                    margin = _second_best_margin(
+                        E_bg,
+                        E_full,
+                        chunk=matmul_chunk,
+                        device=device,
+                    )
+                for j, bg_p in enumerate(
+                    tqdm(
+                        bg_paths,
+                        desc=f"Exact-pixel {group_name}/{label}",
+                        leave=False,
+                    )
+                ):
+                    with Image.open(bg_p) as im:
+                        bg_rgb = np.asarray(im.convert("RGB"), dtype=np.uint8)
+                    counts = _exact_pixel_match_counts(bg_rgb, full_paths)
+                    cos_vec = cos_all[j].astype(np.float64)
+                    # lexsort: last key is primary ascending → largest count last; first key
+                    # breaks ties so highest cosine last among equal counts.
+                    order = np.lexsort((cos_vec, counts.astype(np.int64)))
+                    fi = int(order[-1])
+                    sim = float(cos_vec[fi])
+                    row = {
+                        "group": group_name,
+                        "label": label,
+                        "bg_only_relpath": _to_rel(bg_p, waterbirds_root),
+                        "full_relpath": _to_rel(
+                            full_paths[fi], waterbirds_root
+                        ),
+                        "cosine_similarity": sim,
+                        "exact_pixel_matches": int(counts[fi]),
+                    }
+                    if margin is not None:
+                        row["best_minus_second"] = float(margin[j])
+                    matches.append(row)
+            else:
+                best_idx, best_sim = _match_bg_to_full(
+                    E_bg, E_full, chunk=matmul_chunk, device=device
                 )
+                margin = None
+                if min_margin is not None:
+                    margin = _second_best_margin(
+                        E_bg,
+                        E_full,
+                        chunk=matmul_chunk,
+                        device=device,
+                    )
 
-            for j, bg_p in enumerate(bg_paths):
-                fi = int(best_idx[j])
-                sim = float(best_sim[j])
-                row = {
-                    "group": group_name,
-                    "label": label,
-                    "bg_only_relpath": _to_rel(bg_p, waterbirds_root),
-                    "full_relpath": _to_rel(full_paths[fi], waterbirds_root),
-                    "cosine_similarity": sim,
-                }
-                if margin is not None:
-                    row["best_minus_second"] = float(margin[j])
-                matches.append(row)
+                for j, bg_p in enumerate(bg_paths):
+                    fi = int(best_idx[j])
+                    sim = float(best_sim[j])
+                    row = {
+                        "group": group_name,
+                        "label": label,
+                        "bg_only_relpath": _to_rel(bg_p, waterbirds_root),
+                        "full_relpath": _to_rel(
+                            full_paths[fi], waterbirds_root
+                        ),
+                        "cosine_similarity": sim,
+                    }
+                    if margin is not None:
+                        row["best_minus_second"] = float(margin[j])
+                    matches.append(row)
 
     return matches, meta
 
@@ -326,6 +400,16 @@ def main() -> None:
             "(ambiguous neighbors)"
         ),
     )
+    parser.add_argument(
+        "--exact-pixel",
+        action="store_true",
+        help=(
+            "Sort full-image candidates by exact RGB pixel agreement first (full image "
+            "resized to each bg_only size, then count matching pixels), then by SigLIP "
+            "cosine. Slower (loads every pair in software) but picks true pixel matches "
+            "when backgrounds align. Adds field exact_pixel_matches to each row."
+        ),
+    )
     args = parser.parse_args()
 
     device = torch.device(args.device)
@@ -338,6 +422,7 @@ def main() -> None:
         device=device,
         use_amp=not args.no_amp,
         min_margin=args.min_best_minus_second,
+        exact_pixel=args.exact_pixel,
     )
 
     if args.min_best_minus_second is not None:
@@ -354,13 +439,15 @@ def main() -> None:
         }
 
     summary = _summarize(matches)
-    mapping = {
-        m["bg_only_relpath"]: {
+    mapping = {}
+    for m in matches:
+        entry = {
             "full_relpath": m["full_relpath"],
             "cosine_similarity": m["cosine_similarity"],
         }
-        for m in matches
-    }
+        if "exact_pixel_matches" in m:
+            entry["exact_pixel_matches"] = m["exact_pixel_matches"]
+        mapping[m["bg_only_relpath"]] = entry
     payload = {
         "meta": meta,
         "summary": summary,

@@ -71,6 +71,10 @@ LOG="${MATCHING_LOG:-$ROOT/matching_logs.log}"
 WB_ROOT="${WATERBIRDS_ROOT:-data/datasets/Waterbirds}"
 OUT_JSON="${MATCHING_OUTPUT:-data/datasets/Waterbirds/bg_only_to_full_siglip.json}"
 PID_FILE="${MATCHING_PID_FILE:-$ROOT/matching_logs.pid}"
+EXTRA_ARGS=()
+if [[ "${EXACT_PIXEL:-0}" == "1" ]]; then
+  EXTRA_ARGS+=(--exact-pixel)
+fi
 
 log() {
   # Copy to log and to stderr so interactive runs are not "silent"
@@ -111,7 +115,7 @@ fi
   echo "Interpreter: $PYTHON ($("$PYTHON" -c 'import sys; print(sys.version.split()[0])' 2>/dev/null || echo 'version?'))"
   echo "Command: $PYTHON scripts/match_waterbirds_bg_only_to_full_siglip.py \\"
   echo "  --waterbirds-root $WB_ROOT \\"
-  echo "  --output $OUT_JSON"
+  echo "  --output $OUT_JSON ${EXTRA_ARGS[@]}"
 } >>"$LOG"
 
 log "Preflight: testing import open_clip + occam …"
@@ -133,7 +137,8 @@ log "Preflight OK. Starting background worker…"
   echo "---- worker start $(date -Iseconds 2>/dev/null || date) ----"
   PYTHONUNBUFFERED=1 "$PYTHON" scripts/match_waterbirds_bg_only_to_full_siglip.py \
     --waterbirds-root "$WB_ROOT" \
-    --output "$OUT_JSON"
+    --output "$OUT_JSON" \
+    ${EXTRA_ARGS[@]}
   ec=$?
   echo "---- worker end $(date -Iseconds 2>/dev/null || date) exit_code=$ec ----"
   exit "$ec"
