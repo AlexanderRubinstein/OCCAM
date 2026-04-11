@@ -18,9 +18,11 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 from occam.datasets.waterbirds_layout import (
+    AUX_BG_ONLY_ROOT,
     REQUIRED_TOP_LEVEL,
     assert_waterbirds_layout,
     migrate_legacy_tar_extract_to_hub_layout,
+    subscenario_background_only,
 )
 
 # Default dataset repo once published; override with OCCAM_WATERBIRDS_HF_DATASET or CLI.
@@ -54,8 +56,11 @@ def extract_waterbirds_from_uc_wb_ca_tar(
     Google Drive archive into dest_waterbirds_root.
 
     The archive uses legacy paths (``test_split/group_*``, ``FG-Only/test_split/group_*``);
-    this rewrites them in-place to eight top-level subscenario folders (e.g.
-    ``landbird_on_land``, ``landbird_on_land_fg_only``, …).
+    this rewrites them in-place to eight core top-level subscenario folders (e.g.
+    ``landbird_on_land``, ``landbird_on_land_fg_only``, …). If the archive also contains
+    ``bg_only/test_split/group_*``, leave it in place; use
+    :func:`occam.datasets.waterbirds_layout.materialize_bg_only_subscenarios` to populate
+    ``*_bg_only`` folders before a full Hub upload.
     """
     os.makedirs(dest_waterbirds_root, exist_ok=True)
     with tarfile.open(tar_path, "r:*") as tf:
@@ -101,18 +106,38 @@ def file_sha256(path: str, chunk: int = 1 << 20) -> str:
     return h.hexdigest()
 
 
+def _waterbirds_compare_ignore_top_dirs(
+    *,
+    ignore_bg_only_subtrees: bool,
+    extra: Optional[Iterable[str]],
+) -> set[str]:
+    dirs = set(extra or [])
+    if ignore_bg_only_subtrees:
+        dirs.add(AUX_BG_ONLY_ROOT)
+        dirs.update(subscenario_background_only(gid) for gid in range(4))
+    return dirs
+
+
 def iter_compare_files(
     root: str,
     ignore_top_files: Optional[Iterable[str]] = None,
+    ignore_top_level_dirs: Optional[Iterable[str]] = None,
 ) -> Iterator[Tuple[str, str]]:
     """
     Yields (relative_path_posix, sha256) for every file under root, sorted by path.
     Skips symlink targets as separate logic (none expected).
+
+    ``ignore_top_level_dirs``: do not descend into these directory names directly under
+    ``root`` (useful to skip auxiliary ``bg_only/`` or ``*_bg_only`` trees when comparing
+    tar-derived trees to Hub snapshots).
     """
     ignore = set(ignore_top_files or [])
+    ignore_dirs = set(ignore_top_level_dirs or [])
     root = os.path.abspath(root)
     out: List[Tuple[str, str]] = []
     for dirpath, dirnames, filenames in os.walk(root):
+        if os.path.abspath(dirpath) == root:
+            dirnames[:] = [d for d in sorted(dirnames) if d not in ignore_dirs]
         # stable walk
         dirnames.sort()
         filenames.sort()
@@ -134,12 +159,35 @@ def compare_waterbirds_trees(
     dir_a: str,
     dir_b: str,
     ignore_top_files: Optional[Iterable[str]] = None,
+    ignore_top_level_dirs: Optional[Iterable[str]] = None,
+    ignore_bg_only_subtrees: bool = True,
 ) -> Tuple[bool, List[str]]:
     """
     Return (ok, messages). Compares relative paths and SHA-256 of every file.
+
+    When ``ignore_bg_only_subtrees`` is True (default), skips the auxiliary ``bg_only/``
+    tree and top-level ``*_bg_only`` folders so a Google Drive tar (eight core folders) can
+    match a Hub tree that also ships background-only crops. Pass ``False`` for a strict
+    comparison of all twelve subscenario trees.
     """
-    a = list(iter_compare_files(dir_a, ignore_top_files=ignore_top_files))
-    b = list(iter_compare_files(dir_b, ignore_top_files=ignore_top_files))
+    merged_dirs = _waterbirds_compare_ignore_top_dirs(
+        ignore_bg_only_subtrees=ignore_bg_only_subtrees,
+        extra=ignore_top_level_dirs,
+    )
+    a = list(
+        iter_compare_files(
+            dir_a,
+            ignore_top_files=ignore_top_files,
+            ignore_top_level_dirs=merged_dirs,
+        )
+    )
+    b = list(
+        iter_compare_files(
+            dir_b,
+            ignore_top_files=ignore_top_files,
+            ignore_top_level_dirs=merged_dirs,
+        )
+    )
     msgs: List[str] = []
     if len(a) != len(b):
         msgs.append(f"File count differs: {len(a)} vs {len(b)}")
@@ -160,7 +208,7 @@ def compare_waterbirds_trees(
 
 def prepare_tree_for_compare(waterbirds_root: str) -> tuple[str, Optional[str]]:
     """
-    If ``waterbirds_root`` is already the eight-folder Hub layout, return it unchanged.
+    If ``waterbirds_root`` is already the core Hub layout (eight folders), return it unchanged.
     Otherwise copy into a temp dir in that layout (legacy or ``FG_plus_BG``/``FG`` split)
     and return ``(temp_path, temp_path)`` for cleanup.
     """

@@ -8,8 +8,9 @@ downloads the HF snapshot into a temporary directory, then compares SHA-256 per 
 README.md and other Hub-only root files are ignored on the HF side.
 
 Legacy folders (``test_split/``) or older ``FG_plus_BG``/``FG`` splits are normalized
-to the eight-folder subscenario Hub layout in a temp copy when needed, without mutating
-the originals.
+to the core eight-folder Hub layout in a temp copy when needed, without mutating
+the originals. By default, ``*_bg_only`` trees and auxiliary ``bg_only/`` are ignored when
+comparing the Google Drive tar to the Hub snapshot (see ``compare_waterbirds_trees``).
 """
 
 from __future__ import annotations
@@ -54,6 +55,14 @@ def main():
         "--keep",
         action="store_true",
         help="Print temp directories and do not delete them (for debugging)",
+    )
+    parser.add_argument(
+        "--strict-bg-only-compare",
+        action="store_true",
+        help=(
+            "Include ``*_bg_only`` and ``bg_only/`` in the byte-wise tree comparison "
+            "(default skips them so the Drive tar matches a Hub tree with extra bg-only crops)"
+        ),
     )
     parser.add_argument(
         "--from-gdrive-tree",
@@ -125,7 +134,10 @@ def main():
 
         ignore = {"README.md", ".gitattributes"}
         ok, msgs = waterbirds_hf_common.compare_waterbirds_trees(
-            gdrive_side, hf_side, ignore_top_files=ignore
+            gdrive_side,
+            hf_side,
+            ignore_top_files=ignore,
+            ignore_bg_only_subtrees=not args.strict_bg_only_compare,
         )
         if ok:
             print(

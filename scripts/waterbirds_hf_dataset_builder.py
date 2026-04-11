@@ -27,12 +27,16 @@ from datasets import (
 _SUBSCENARIOS: Tuple[str, ...] = (
     "landbird_on_land",
     "landbird_on_land_fg_only",
+    "landbird_on_land_bg_only",
     "landbird_on_water",
     "landbird_on_water_fg_only",
+    "landbird_on_water_bg_only",
     "waterbird_on_land",
     "waterbird_on_land_fg_only",
+    "waterbird_on_land_bg_only",
     "waterbird_on_water",
     "waterbird_on_water_fg_only",
+    "waterbird_on_water_bg_only",
 )
 
 _IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"}
@@ -80,7 +84,7 @@ class Waterbirds(GeneratorBasedBuilder):
     def _info(self) -> DatasetInfo:
         return DatasetInfo(
             description=(
-                "Waterbirds (OCCAM layout): eight subscenario directories at repo root, "
+                "Waterbirds (OCCAM layout): twelve subscenario directories at repo root, "
                 "each with coarse class folders 0 (waterbird) and 1 (landbird)."
             ),
             features=Features(

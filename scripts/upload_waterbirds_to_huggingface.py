@@ -3,9 +3,9 @@
 Create / update a Hugging Face *dataset* repository with the local Waterbirds tree
 and a dataset card (README.md).
 
-Hub layout uses **eight top-level subscenario folders** (each with class subdirs ``0``/``1``):
-
-  ``landbird_on_land``, ``landbird_on_land_fg_only``, ``landbird_on_water``, …
+Hub layout uses **twelve top-level subscenario folders** (each with class subdirs ``0``/``1``):
+full scene, ``*_fg_only``, and ``*_bg_only`` per spurious-cue group (e.g.
+``landbird_on_land``, ``landbird_on_land_fg_only``, ``landbird_on_land_bg_only``, …).
 
 The dataset card YAML includes a ``configs`` block (one ``data_dir`` per subscenario) so
 the Hub Dataset Viewer shows a **Subset** per subscenario without a Python loading script
@@ -37,9 +37,11 @@ from occam.datasets.utils import DATASETS_PATH
 from occam.datasets.waterbirds_layout import (
     GROUP_SUBDIRS,
     REQUIRED_TOP_LEVEL,
+    assert_full_hub_subscenario_tree,
     assert_uploadable_waterbirds,
     assert_waterbirds_layout,
     detect_layout,
+    materialize_bg_only_subscenarios,
     migrate_legacy_tar_extract_to_hub_layout,
     migrate_split_layout_to_subscenarios,
     source_dir_for_subscenario,
@@ -128,7 +130,7 @@ def build_debug_waterbirds_staging(
 ) -> tuple[int, list[str]]:
     """
     Copy up to ``per_group`` images per **subscenario** folder into ``dest_root``.
-    Source may be hub (eight folders), ``FG_plus_BG``/``FG`` split, or legacy.
+    Source may be hub (twelve folders), ``FG_plus_BG``/``FG`` split, or legacy.
     """
     layout = detect_layout(src_wb)
     rel_uploaded: list[str] = []
@@ -161,12 +163,16 @@ def dataset_readme_body() -> str:
         f"| `{g}_fg_only` | Foreground-only crop for the same group as `{g}` |"
         for g in GROUP_SUBDIRS
     )
+    sub_rows_bg = "\n".join(
+        f"| `{g}_bg_only` | Background-only crop for the same group as `{g}` |"
+        for g in GROUP_SUBDIRS
+    )
     return f"""# Waterbirds (OCCAM layout)
 
 This repository hosts the **Waterbirds** image files used in the
 [OCCAM]({OCCAM_PAPER_HF}) codebase ([arXiv]({OCCAM_PAPER_ARXIV})),
-laid out for experiments on **subpopulation / group shifts** and **foreground-only**
-evaluation.
+laid out for experiments on **subpopulation / group shifts**, **foreground-only**, and
+**background-only** evaluation.
 
 ## Original data and credit
 
@@ -181,15 +187,20 @@ Please cite that work when using the original benchmark. Licensing and redistrib
 terms of the underlying images follow the original dataset / WILDS release; refer to
 the paper and official sources for details.
 
-## Folder layout (eight subscenarios)
+## Folder layout (twelve subscenarios)
 
-On the Hugging Face **Files** tab you should see **eight** top-level folders. Each
-``*_fg_only`` folder matches the **same spurious-cue group** as the folder without the
-suffix (historical ``group_0`` … ``group_3``):
+On the Hugging Face **Files** tab you should see **twelve** top-level folders (three per
+historical ``group_0`` … ``group_3``): the original scene, ``*_fg_only`` (foreground crop),
+and ``*_bg_only`` (background crop). Each triplet shares the **same spurious-cue group**:
 
 {table_header}
 {sub_rows}
 {sub_rows_fg}
+{sub_rows_bg}
+
+Background-only crops are staged under ``bg_only/test_split/group_*`` locally and copied
+into ``*_bg_only`` by the OCCAM upload script (see ``materialize_bg_only_subscenarios`` in
+``occam/datasets/waterbirds_layout.py``).
 
 ### Class labels inside ``0/`` and ``1/``
 
@@ -206,6 +217,10 @@ Foreground-only crops follow the **deep feature reweighting** setting; extractio
 Kirichenko, Izmailov & Wilson,
 *Last Layer Re-Training is Sufficient for Robustness to Spurious Correlations*
 ([arXiv:2204.02937]({DFR_PAPER}); [code](https://github.com/PolinaKirichenko/deep_feature_reweighting)).
+
+Background-only crops use the same grouping as the original Waterbirds benchmark; they are
+distributed alongside the other subscenarios for analysis (e.g. background shift without
+the bird).
 
 ## Hub Dataset Viewer (Subset = subscenario)
 
@@ -250,7 +265,7 @@ def _dataset_card_yaml_frontmatter(*, debug: bool) -> str:
     if debug:
         lines = [
             "license: other",
-            "pretty_name: Waterbirds (OCCAM) — DEBUG sample only",
+            "pretty_name: Waterbirds (OCCAM) — DEBUG sample (12 subscenarios)",
             "tags:",
             "- image",
             "- image-classification",
@@ -265,7 +280,7 @@ def _dataset_card_yaml_frontmatter(*, debug: bool) -> str:
     else:
         lines = [
             "license: other",
-            "pretty_name: Waterbirds (OCCAM — eight subscenarios + class labels)",
+            "pretty_name: Waterbirds (OCCAM — twelve subscenarios + class labels)",
             "tags:",
             "- image",
             "- image-classification",
@@ -312,7 +327,7 @@ def main():
         "--folder",
         default=os.path.join(DATASETS_PATH, "Waterbirds"),
         help=(
-            "Local Waterbirds root (eight subscenario folders after migration; "
+            "Local Waterbirds root (twelve subscenario folders after migration; "
             "legacy ``test_split/`` is migrated in place before full upload)"
         ),
     )
@@ -450,6 +465,19 @@ def main():
         )
 
     if args.debug:
+        if detect_layout(wb) == "legacy":
+            print(
+                "Local folder uses legacy layout (test_split / FG-Only). "
+                "Migrating in place before debug staging …"
+            )
+            migrate_legacy_tar_extract_to_hub_layout(wb)
+        migrate_split_layout_to_subscenarios(wb)
+        n_bg = materialize_bg_only_subscenarios(wb)
+        if n_bg:
+            print(
+                f"Materialized background-only subscenarios from ``bg_only/test_split/`` "
+                f"({n_bg} group trees copied to ``*_bg_only``)."
+            )
         per = args.debug_per_group
         with tempfile.TemporaryDirectory(prefix="waterbirds_hf_debug_") as tmp:
             n, rels = build_debug_waterbirds_staging(wb, tmp, per_group=per)
@@ -482,11 +510,18 @@ def main():
         if detect_layout(wb) == "legacy":
             print(
                 "Local folder uses legacy layout (test_split / FG-Only). "
-                "Migrating in place to eight subscenario folders …"
+                "Migrating in place to core subscenario folders …"
             )
             migrate_legacy_tar_extract_to_hub_layout(wb)
         migrate_split_layout_to_subscenarios(wb)
         assert_waterbirds_layout(wb)
+        n_bg = materialize_bg_only_subscenarios(wb)
+        if n_bg:
+            print(
+                f"Materialized background-only subscenarios from ``bg_only/test_split/`` "
+                f"({n_bg} group trees copied to ``*_bg_only``)."
+            )
+        assert_full_hub_subscenario_tree(wb)
 
         patterns = [f"{name}/*" for name in REQUIRED_TOP_LEVEL]
         print(

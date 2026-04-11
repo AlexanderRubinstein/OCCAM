@@ -16,6 +16,7 @@ from occam.datasets.utils import (
     torch_max_func,
 )
 from occam.datasets.waterbirds_layout import (
+    path_background_only,
     path_foreground_only,
     path_with_background,
 )
@@ -30,6 +31,10 @@ WATERBIRDS_PATHS = [
 ]
 WATERBIRDS_ONLY_FG_PATHS = [
     path_foreground_only(WATERBIRDS_BASE_PATH, group_id)
+    for group_id in range(4)
+]
+WATERBIRDS_ONLY_BG_PATHS = [
+    path_background_only(WATERBIRDS_BASE_PATH, group_id)
     for group_id in range(4)
 ]
 
