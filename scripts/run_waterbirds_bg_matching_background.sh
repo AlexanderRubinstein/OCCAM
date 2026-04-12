@@ -13,11 +13,19 @@ usage() {
   printf '%s\n' \
     "Run match_waterbirds_bg_only_to_full_siglip.py in the background; logs to matching_logs.log." \
     "" \
-    "Usage: $(basename "$0") [-e DIR | -p PATH] [--exact-pixel] [--class 0|1]" \
+    "Usage: $(basename "$0") [-e DIR | -p PATH] [--exact-pixel] [--debug] [--class 0|1]" \
+    "  [--search-places|--match-to-original] [--places-dir DIR] [--apply-same-square] [--drop-black] [--fg-only-root DIR]" \
     "  -e, --venv DIR     Virtualenv root (runs DIR/bin/python)" \
     "  -p, --python PATH  Python interpreter to use" \
     "  --exact-pixel      Forward to Python (pixel-then-SigLIP matching)" \
+    "  --debug            Forward to Python (stop after 3 matches; copies under ./debug_match/)" \
     "  --class N          Forward to Python; N is 0 or 1 (one coarse label only)" \
+    "  --search-places    Forward to Python (match bg_only to warped Places365 pool)" \
+    "  --match-to-original Forward to Python (match each FG+BG image to nearest Places pool)" \
+    "  --places-dir DIR   Forward to Python (required with Places modes)" \
+    "  --apply-same-square Forward to Python (Places: same black square as paired full before SigLIP)" \
+    "  --drop-black       Forward to Python (Places: splice out FG square before SigLIP)" \
+    "  --fg-only-root DIR Forward to Python (with --apply-same-square/--drop-black; default <Waterbirds>/FG-Only)" \
     "  -h, --help         Show this help" \
     "" \
     "If -e / -p are omitted, uses PYTHON, OCCAM_PYTHON, or repo env heuristics." \
@@ -53,6 +61,10 @@ while [[ $# -gt 0 ]]; do
       EXTRA_ARGS+=(--exact-pixel)
       shift
       ;;
+    --debug)
+      EXTRA_ARGS+=(--debug)
+      shift
+      ;;
     --class)
       [[ -n "${2:-}" ]] || {
         printf '%s\n' "ERROR: --class requires 0 or 1" >&2
@@ -66,6 +78,38 @@ while [[ $# -gt 0 ]]; do
           ;;
       esac
       EXTRA_ARGS+=(--class "$2")
+      shift 2
+      ;;
+    --search-places)
+      EXTRA_ARGS+=(--search-places)
+      shift
+      ;;
+    --match-to-original)
+      EXTRA_ARGS+=(--match-to-original)
+      shift
+      ;;
+    --places-dir)
+      [[ -n "${2:-}" ]] || {
+        printf '%s\n' "ERROR: --places-dir requires a directory argument" >&2
+        exit 1
+      }
+      EXTRA_ARGS+=(--places-dir "$2")
+      shift 2
+      ;;
+    --apply-same-square)
+      EXTRA_ARGS+=(--apply-same-square)
+      shift
+      ;;
+    --drop-black)
+      EXTRA_ARGS+=(--drop-black)
+      shift
+      ;;
+    --fg-only-root)
+      [[ -n "${2:-}" ]] || {
+        printf '%s\n' "ERROR: --fg-only-root requires a directory argument" >&2
+        exit 1
+      }
+      EXTRA_ARGS+=(--fg-only-root "$2")
       shift 2
       ;;
     --)
