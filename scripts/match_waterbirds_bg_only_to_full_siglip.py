@@ -17,6 +17,19 @@ with ``<group>/`` filenames.
 
 Requires: ``torch``, ``open_clip``, ``Pillow``, ``tqdm`` (same stack as OCCAM CLIP / SigLIP eval).
 
+**Runtime (very rough):** Waterbirds-only matching (default mode) is often **tens of minutes**
+on a GPU for the full twelve subscenarios, dominated by SigLIP embedding and (with
+``--exact-pixel``) CPU pixel counting. **Places** modes (``--search-places`` /
+``--match-to-original``) can run **many hours**: each distinct canvas / occlusion cache key
+embeds the entire Places pool once, so wall time scales with
+``(#cache_keys) × |Places images| / batch_size`` plus query embeddings. Use ``--class``,
+``--debug``, or a smaller ``--places-*-categories`` list to probe faster; see
+``--verbose-timing`` and JSON ``meta["timings_s"]`` for where time went.
+
+A **global warp progress bar** (stderr tqdm, on by default for Places modes) grows its total
+whenever a new embedding cache key is filled; each Places image warped for that key advances
+the bar so you can see how many warps remain. Use ``--no-warp-progress`` to turn it off.
+
 Example:
 
   python scripts/match_waterbirds_bg_only_to_full_siglip.py \\
@@ -44,14 +57,17 @@ Example:
 from __future__ import annotations
 
 import argparse
+import atexit
 import csv
 import importlib.util
 import json
 import os
 import shutil
 import sys
+import time
 from collections import defaultdict
-from typing import Dict, List, Optional, Sequence, Tuple
+from contextlib import contextmanager
+from typing import Dict, Iterator, List, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -99,6 +115,53 @@ def _prepare_places_square_region(
     return rgb
 
 
+def _apply_places_fg_occlusion(
+    norm_mod,
+    pil: Image.Image,
+    *,
+    keep_mask_shape: bool,
+    fg_path: Optional[str],
+    apply_same_square: bool,
+    drop_black: bool,
+    x0: int,
+    y0: int,
+    side: int,
+    warn_prefix: str,
+) -> Image.Image:
+    """
+    Occlude warped Places / query pixels like the paired Waterbirds composite: bird-shaped
+    FG mask (``--keep-mask-shape``), square splice (``--drop-black``), or black square
+    (``--apply-same-square``). ``--keep-mask-shape`` wins over ``--apply-same-square`` for
+    painting; it cannot be combined with ``--drop-black`` (enforced in CLI).
+    """
+    if drop_black:
+        return _prepare_places_square_region(
+            norm_mod,
+            pil,
+            x0,
+            y0,
+            side,
+            apply_same_square=False,
+            drop_black=True,
+        )
+    if keep_mask_shape:
+        rgb = pil.convert("RGB")
+        if fg_path and os.path.isfile(fg_path):
+            return norm_mod.mask_bird_shape_from_fg(
+                rgb, fg_path, warn_prefix=warn_prefix
+            )
+        return rgb
+    return _prepare_places_square_region(
+        norm_mod,
+        pil,
+        x0,
+        y0,
+        side,
+        apply_same_square=apply_same_square,
+        drop_black=False,
+    )
+
+
 from occam.datasets.utils import DATASETS_PATH
 from occam.datasets.waterbirds_layout import (
     GROUP_SUBDIRS,
@@ -107,6 +170,33 @@ from occam.datasets.waterbirds_layout import (
 )
 
 DEBUG_MATCH_LIMIT = 3
+
+
+class MatchPhaseTimer:
+    """
+    Accumulates wall-clock seconds per named phase. Used for JSON ``meta["timings_s"]`` and,
+    when ``verbose`` is true, prints each finished block to stderr.
+    """
+
+    __slots__ = ("verbose", "seconds")
+
+    def __init__(self, verbose: bool = False) -> None:
+        self.verbose = verbose
+        self.seconds: Dict[str, float] = defaultdict(float)
+
+    @contextmanager
+    def scope(self, name: str) -> Iterator[None]:
+        t0 = time.perf_counter()
+        try:
+            yield
+        finally:
+            dt = time.perf_counter() - t0
+            self.seconds[name] += dt
+            if self.verbose:
+                print(f"[timing] {name}: {dt:.3f}s", file=sys.stderr)
+
+    def as_meta_dict(self) -> Dict[str, float]:
+        return {k: round(v, 4) for k, v in sorted(self.seconds.items())}
 
 
 def _save_debug_match_pair(
@@ -185,6 +275,58 @@ import torch
 import torch.nn.functional as F
 from PIL import Image
 from tqdm import tqdm
+
+
+class PlacesWarpProgressBar:
+    """
+    Global stderr tqdm counting each Places image warped to a canvas (one step per
+    ``place_paths`` entry whenever a new ``pool_emb_cache`` key is filled). The bar is
+    created on the first cache miss and closed via ``atexit`` (and ``close()`` is idempotent).
+    """
+
+    __slots__ = ("_atexit_registered", "_enabled", "_pbar")
+
+    def __init__(self, enabled: bool) -> None:
+        self._enabled = bool(enabled)
+        self._pbar: Optional[tqdm] = None
+        self._atexit_registered = False
+
+    def is_active(self) -> bool:
+        return self._pbar is not None
+
+    def _ensure(self) -> None:
+        if not self._enabled or self._pbar is not None:
+            return
+        self._pbar = tqdm(
+            total=0,
+            desc="Places warps",
+            unit="warp",
+            file=sys.stderr,
+            mininterval=0.25,
+            dynamic_ncols=True,
+            smoothing=0.08,
+        )
+        if not self._atexit_registered:
+            atexit.register(self.close)
+            self._atexit_registered = True
+
+    def close(self) -> None:
+        if self._pbar is not None:
+            self._pbar.close()
+            self._pbar = None
+
+    def on_cache_miss(self, num_place_images: int, postfix: str) -> None:
+        if not self._enabled:
+            return
+        self._ensure()
+        assert self._pbar is not None
+        self._pbar.total = int(self._pbar.total) + int(num_place_images)
+        self._pbar.set_postfix_str(postfix[:80], refresh=False)
+        self._pbar.refresh()
+
+    def step(self) -> None:
+        if self._pbar is not None:
+            self._pbar.update(1)
 
 
 _IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif")
@@ -379,6 +521,7 @@ def embed_pil_images(
     batch_size: int,
     amp_dtype: torch.dtype | None,
     desc: str = "Embedding (Places)",
+    disable_batch_progress: bool = False,
 ) -> torch.Tensor:
     """Return L2-normalized float32 CPU tensor ``[N, D]`` for in-memory RGB PIL images."""
     out_chunks: List[torch.Tensor] = []
@@ -387,7 +530,7 @@ def embed_pil_images(
         range(0, n, batch_size),
         desc=desc,
         unit="batch",
-        disable=n <= batch_size,
+        disable=disable_batch_progress or (n <= batch_size),
     ):
         batch_imgs = images[i : i + batch_size]
         tensors = [preprocess(im) for im in batch_imgs]
@@ -486,16 +629,19 @@ def run_matching(
     class_label: Optional[str],
     debug: bool = False,
     debug_dir: str = "",
+    timer: Optional[MatchPhaseTimer] = None,
 ) -> Tuple[List[dict], dict]:
     waterbirds_root = os.path.abspath(waterbirds_root)
     amp_dtype = torch.float16 if use_amp and device.type == "cuda" else None
     dbg_out = os.path.abspath(debug_dir or "debug_match") if debug else ""
+    tt = timer or MatchPhaseTimer(False)
 
-    model, _, preprocess = open_clip.create_model_and_transforms(
-        model_id,
-        pretrained=pretrained,
-    )
-    model = model.to(device).eval()
+    with tt.scope("siglip_model_load"):
+        model, _, preprocess = open_clip.create_model_and_transforms(
+            model_id,
+            pretrained=pretrained,
+        )
+        model = model.to(device).eval()
 
     matches: List[dict] = []
     meta = {
@@ -527,89 +673,96 @@ def run_matching(
             if not full_paths or not bg_paths:
                 continue
 
-            E_full = embed_image_paths(
-                model,
-                preprocess,
-                full_paths,
-                device=device,
-                batch_size=batch_size,
-                amp_dtype=amp_dtype,
-            )
-            E_bg = embed_image_paths(
-                model,
-                preprocess,
-                bg_paths,
-                device=device,
-                batch_size=batch_size,
-                amp_dtype=amp_dtype,
-            )
+            with tt.scope("embed_full_images"):
+                E_full = embed_image_paths(
+                    model,
+                    preprocess,
+                    full_paths,
+                    device=device,
+                    batch_size=batch_size,
+                    amp_dtype=amp_dtype,
+                )
+            with tt.scope("embed_bg_images"):
+                E_bg = embed_image_paths(
+                    model,
+                    preprocess,
+                    bg_paths,
+                    device=device,
+                    batch_size=batch_size,
+                    amp_dtype=amp_dtype,
+                )
 
             if exact_pixel:
-                cos_all = (E_bg @ E_full.t()).cpu().numpy()
-                margin = None
-                if min_margin is not None:
-                    margin = _second_best_margin(
-                        E_bg,
-                        E_full,
-                        chunk=matmul_chunk,
-                        device=device,
-                    )
-                for j, bg_p in enumerate(
-                    tqdm(
-                        bg_paths,
-                        desc=f"Exact-pixel {group_name}/{label}",
-                        leave=False,
-                    )
-                ):
-                    with Image.open(bg_p) as im:
-                        bg_rgb = np.asarray(im.convert("RGB"), dtype=np.uint8)
-                    counts = _exact_pixel_match_counts(bg_rgb, full_paths)
-                    cos_vec = cos_all[j].astype(np.float64)
-                    # lexsort: last key is primary ascending → largest count last; first key
-                    # breaks ties so highest cosine last among equal counts.
-                    order = np.lexsort((cos_vec, counts.astype(np.int64)))
-                    fi = int(order[-1])
-                    sim = float(cos_vec[fi])
-                    row = {
-                        "group": group_name,
-                        "label": label,
-                        "bg_only_relpath": _to_rel(bg_p, waterbirds_root),
-                        "full_relpath": _to_rel(
-                            full_paths[fi], waterbirds_root
-                        ),
-                        "cosine_similarity": sim,
-                        "exact_pixel_matches": int(counts[fi]),
-                    }
-                    if margin is not None:
-                        row["best_minus_second"] = float(margin[j])
-                    matches.append(row)
-                    if debug:
-                        _save_debug_match_pair(
-                            matches[-1],
-                            len(matches) - 1,
-                            waterbirds_root,
-                            None,
-                            dbg_out,
+                with tt.scope("waterbirds_exact_pixel_cosine_and_margin"):
+                    cos_all = (E_bg @ E_full.t()).cpu().numpy()
+                    margin = None
+                    if min_margin is not None:
+                        margin = _second_best_margin(
+                            E_bg,
+                            E_full,
+                            chunk=matmul_chunk,
+                            device=device,
                         )
-                        print(
-                            f"--debug: saved pair #{len(matches)} under {dbg_out!r}",
-                            file=sys.stderr,
+                with tt.scope("waterbirds_exact_pixel_count_loop"):
+                    for j, bg_p in enumerate(
+                        tqdm(
+                            bg_paths,
+                            desc=f"Exact-pixel {group_name}/{label}",
+                            leave=False,
                         )
-                    if debug and len(matches) >= DEBUG_MATCH_LIMIT:
-                        meta["debug_early_stop"] = True
-                        return matches, meta
+                    ):
+                        with Image.open(bg_p) as im:
+                            bg_rgb = np.asarray(
+                                im.convert("RGB"), dtype=np.uint8
+                            )
+                        counts = _exact_pixel_match_counts(bg_rgb, full_paths)
+                        cos_vec = cos_all[j].astype(np.float64)
+                        # lexsort: last key is primary ascending → largest count last; first key
+                        # breaks ties so highest cosine last among equal counts.
+                        order = np.lexsort((cos_vec, counts.astype(np.int64)))
+                        fi = int(order[-1])
+                        sim = float(cos_vec[fi])
+                        row = {
+                            "group": group_name,
+                            "label": label,
+                            "bg_only_relpath": _to_rel(bg_p, waterbirds_root),
+                            "full_relpath": _to_rel(
+                                full_paths[fi], waterbirds_root
+                            ),
+                            "cosine_similarity": sim,
+                            "exact_pixel_matches": int(counts[fi]),
+                        }
+                        if margin is not None:
+                            row["best_minus_second"] = float(margin[j])
+                        matches.append(row)
+                        if debug:
+                            _save_debug_match_pair(
+                                matches[-1],
+                                len(matches) - 1,
+                                waterbirds_root,
+                                None,
+                                dbg_out,
+                            )
+                            print(
+                                f"--debug: saved pair #{len(matches)} under {dbg_out!r}",
+                                file=sys.stderr,
+                            )
+                        if debug and len(matches) >= DEBUG_MATCH_LIMIT:
+                            meta["debug_early_stop"] = True
+                            return matches, meta
             else:
-                best_idx, best_sim = _match_bg_to_full(
-                    E_bg, E_full, chunk=matmul_chunk, device=device
-                )
-                margin = None
-                if min_margin is not None:
-                    margin = _second_best_margin(
-                        E_bg,
-                        E_full,
-                        chunk=matmul_chunk,
-                        device=device,
+                with tt.scope("waterbirds_cosine_argmax_and_margin"):
+                    best_idx, best_sim = _match_bg_to_full(
+                        E_bg, E_full, chunk=matmul_chunk, device=device
                     )
+                    margin = None
+                    if min_margin is not None:
+                        margin = _second_best_margin(
+                            E_bg,
+                            E_full,
+                            chunk=matmul_chunk,
+                            device=device,
+                        )
 
                 for j, bg_p in enumerate(bg_paths):
                     fi = int(best_idx[j])
@@ -676,9 +829,12 @@ def run_matching_places(
     class_label: Optional[str],
     apply_same_square: bool,
     drop_black: bool,
+    keep_mask_shape: bool,
     fg_only_root: str,
     debug: bool = False,
     debug_dir: str = "",
+    timer: Optional[MatchPhaseTimer] = None,
+    warp_progress: bool = True,
 ) -> Tuple[List[dict], dict]:
     """
     Match each ``*_bg_only`` to the nearest **warped** Places365 image (notebook-style
@@ -688,14 +844,19 @@ def run_matching_places(
     places_dir = os.path.abspath(places_dir)
     fg_only_root = os.path.abspath(fg_only_root)
     amp_dtype = torch.float16 if use_amp and device.type == "cuda" else None
-    use_square_geom = apply_same_square or drop_black
+    use_square_grouping = (
+        apply_same_square or drop_black
+    ) and not keep_mask_shape
+    need_norm_mod = use_square_grouping or keep_mask_shape
     dbg_out = os.path.abspath(debug_dir or "debug_match") if debug else ""
+    tt = timer or MatchPhaseTimer(False)
 
-    model, _, preprocess = open_clip.create_model_and_transforms(
-        model_id,
-        pretrained=pretrained,
-    )
-    model = model.to(device).eval()
+    with tt.scope("siglip_model_load"):
+        model, _, preprocess = open_clip.create_model_and_transforms(
+            model_id,
+            pretrained=pretrained,
+        )
+        model = model.to(device).eval()
 
     matches: List[dict] = []
     meta = {
@@ -712,7 +873,9 @@ def run_matching_places(
         "search_places": True,
         "apply_same_square": apply_same_square,
         "drop_black": drop_black,
-        "fg_only_root": fg_only_root if use_square_geom else None,
+        "keep_mask_shape": keep_mask_shape,
+        "fg_only_root": fg_only_root if need_norm_mod else None,
+        "warp_progress_bar": warp_progress,
     }
     if debug:
         meta["debug"] = True
@@ -721,16 +884,18 @@ def run_matching_places(
     labels: Tuple[str, ...] = (
         (class_label,) if class_label in ("0", "1") else ("0", "1")
     )
+    warp_bar = PlacesWarpProgressBar(warp_progress)
 
-    # Cache key: ``(pool_idx, w, h)`` or, with per-image square geometry,
-    # ``(pool_idx, w, h, x0, y0, side)`` (``--apply-same-square`` / ``--drop-black``).
+    # Cache key: plain ``(pool_idx, w, h)``; square ``(pool_idx, w, h, x0, y0, side)``;
+    # mask ``(pool_idx, w, h, "mask", fg_key)`` where ``fg_key`` is an abs path or ``__no_fg__``.
     pool_emb_cache: Dict[
         Tuple[int, ...], Tuple[torch.Tensor, Optional[np.ndarray]]
     ] = {}
 
-    norm_mod = (
-        _load_wb_normalize_resolution_module() if use_square_geom else None
-    )
+    norm_mod = None
+    if need_norm_mod:
+        with tt.scope("wb_normalize_module_load"):
+            norm_mod = _load_wb_normalize_resolution_module()
 
     for gid, group_name in enumerate(GROUP_SUBDIRS):
         pool_idx = _places_pool_index_for_group(group_name)
@@ -762,7 +927,29 @@ def run_matching_places(
             rows_by_bg: Dict[str, dict] = {}
 
             for (w_sz, h_sz), bucket_paths in sorted(buckets.items()):
-                if use_square_geom:
+                warn_p = f"{group_name}/{label}"
+                group_specs: List[Tuple[str, object, List[str]]] = []
+                if keep_mask_shape:
+                    assert norm_mod is not None
+                    mask_groups: Dict[str, List[str]] = defaultdict(list)
+                    for bg_p in bucket_paths:
+                        bn = os.path.basename(bg_p)
+                        fg_p = norm_mod.resolve_fg_only_image_path(
+                            waterbirds_root,
+                            fg_only_root,
+                            gid,
+                            label,
+                            bn,
+                        )
+                        fk = (
+                            os.path.abspath(fg_p)
+                            if fg_p and os.path.isfile(fg_p)
+                            else "__no_fg__"
+                        )
+                        mask_groups[fk].append(bg_p)
+                    for fk, gp in mask_groups.items():
+                        group_specs.append(("mask", fk, gp))
+                elif use_square_grouping:
                     assert norm_mod is not None
                     square_groups: Dict[
                         Tuple[int, int, int], List[str]
@@ -789,53 +976,96 @@ def run_matching_places(
                             gid=gid,
                             label=label,
                             basename=bn,
-                            warn_prefix=f"{group_name}/{label}",
+                            warn_prefix=warn_p,
                         )
                         square_groups[(x0, y0, side)].append(bg_p)
-                    group_iter = list(square_groups.items())
+                    for sq, gp in square_groups.items():
+                        group_specs.append(("square", sq, gp))
                 else:
-                    group_iter = [((0, 0, 0), bucket_paths)]
+                    group_specs.append(("plain", None, bucket_paths))
 
-                for (x0, y0, side), gpaths in group_iter:
-                    ck: Tuple[int, ...] = (
-                        (pool_idx, w_sz, h_sz, x0, y0, side)
-                        if use_square_geom
-                        else (pool_idx, w_sz, h_sz)
-                    )
+                for gkind, ginfo, gpaths in group_specs:
+                    x0 = y0 = side = 0
+                    fg_for_mask: Optional[str] = None
+                    if gkind == "mask":
+                        fg_key = str(ginfo)
+                        ck = (pool_idx, w_sz, h_sz, "mask", fg_key)
+                        fg_for_mask = None if fg_key == "__no_fg__" else fg_key
+                    elif gkind == "square":
+                        assert isinstance(ginfo, tuple)
+                        x0, y0, side = ginfo  # type: ignore[misc]
+                        ck = (pool_idx, w_sz, h_sz, x0, y0, side)
+                    else:
+                        ck = (pool_idx, w_sz, h_sz)
+
                     if ck not in pool_emb_cache:
                         warped_pils: List[Image.Image] = []
                         warped_rgbs: List[np.ndarray] = []
-                        for pp in tqdm(
-                            place_paths,
-                            desc=f"Places warp {group_name}/{label} {w_sz}x{h_sz}",
-                            leave=False,
-                        ):
-                            pil = place_background_from_file(pp, w_sz, h_sz)
-                            if use_square_geom:
-                                assert norm_mod is not None
-                                pil = _prepare_places_square_region(
-                                    norm_mod,
-                                    pil,
-                                    x0,
-                                    y0,
-                                    side,
-                                    apply_same_square=apply_same_square,
-                                    drop_black=drop_black,
-                                )
-                            warped_pils.append(pil)
-                            if exact_pixel:
-                                warped_rgbs.append(
-                                    np.asarray(pil, dtype=np.uint8)
-                                )
-                        E_pl = embed_pil_images(
-                            model,
-                            preprocess,
-                            warped_pils,
-                            device=device,
-                            batch_size=batch_size,
-                            amp_dtype=amp_dtype,
-                            desc=f"SigLIP Places {w_sz}x{h_sz}",
+                        warp_bar.on_cache_miss(
+                            len(place_paths),
+                            f"{group_name}/{label} {w_sz}x{h_sz}",
                         )
+                        use_wp = warp_bar.is_active()
+                        place_iter = (
+                            place_paths
+                            if use_wp
+                            else tqdm(
+                                place_paths,
+                                desc=(
+                                    f"Places warp {group_name}/{label} "
+                                    f"{w_sz}x{h_sz}"
+                                ),
+                                leave=False,
+                            )
+                        )
+                        with tt.scope("places_warp_pool_to_canvas"):
+                            for pp in place_iter:
+                                pil = place_background_from_file(pp, w_sz, h_sz)
+                                if gkind == "mask":
+                                    assert norm_mod is not None
+                                    pil = _apply_places_fg_occlusion(
+                                        norm_mod,
+                                        pil,
+                                        keep_mask_shape=True,
+                                        fg_path=fg_for_mask,
+                                        apply_same_square=False,
+                                        drop_black=False,
+                                        x0=0,
+                                        y0=0,
+                                        side=0,
+                                        warn_prefix=warn_p,
+                                    )
+                                elif gkind == "square":
+                                    assert norm_mod is not None
+                                    pil = _prepare_places_square_region(
+                                        norm_mod,
+                                        pil,
+                                        x0,
+                                        y0,
+                                        side,
+                                        apply_same_square=apply_same_square,
+                                        drop_black=drop_black,
+                                    )
+                                else:
+                                    pil = pil.convert("RGB")
+                                warped_pils.append(pil)
+                                if exact_pixel:
+                                    warped_rgbs.append(
+                                        np.asarray(pil, dtype=np.uint8)
+                                    )
+                                if use_wp:
+                                    warp_bar.step()
+                        with tt.scope("places_embed_warped_pool_siglip"):
+                            E_pl = embed_pil_images(
+                                model,
+                                preprocess,
+                                warped_pils,
+                                device=device,
+                                batch_size=batch_size,
+                                amp_dtype=amp_dtype,
+                                desc=f"SigLIP Places {w_sz}x{h_sz}",
+                                disable_batch_progress=use_wp,
+                            )
                         w_stack: Optional[np.ndarray] = None
                         if exact_pixel:
                             w_stack = np.stack(warped_rgbs, axis=0)
@@ -843,118 +1073,167 @@ def run_matching_places(
 
                     E_places, warped_stack = pool_emb_cache[ck]
 
-                    if use_square_geom:
-                        assert norm_mod is not None
-                        masked_bgs: List[Image.Image] = []
-                        for bg_p in gpaths:
-                            with Image.open(bg_p) as im:
-                                masked_bgs.append(
-                                    _prepare_places_square_region(
-                                        norm_mod,
-                                        im,
-                                        x0,
-                                        y0,
-                                        side,
-                                        apply_same_square=apply_same_square,
-                                        drop_black=drop_black,
+                    with tt.scope("places_prepare_and_embed_queries"):
+                        if gkind == "mask":
+                            assert norm_mod is not None
+                            masked_bgs: List[Image.Image] = []
+                            for bg_p in gpaths:
+                                with Image.open(bg_p) as im:
+                                    masked_bgs.append(
+                                        _apply_places_fg_occlusion(
+                                            norm_mod,
+                                            im,
+                                            keep_mask_shape=True,
+                                            fg_path=fg_for_mask,
+                                            apply_same_square=False,
+                                            drop_black=False,
+                                            x0=0,
+                                            y0=0,
+                                            side=0,
+                                            warn_prefix=warn_p,
+                                        )
                                     )
-                                )
-                        E_bg = embed_pil_images(
-                            model,
-                            preprocess,
-                            masked_bgs,
-                            device=device,
-                            batch_size=batch_size,
-                            amp_dtype=amp_dtype,
-                            desc=f"SigLIP bg {w_sz}x{h_sz}",
-                        )
-                    else:
-                        E_bg = embed_image_paths(
-                            model,
-                            preprocess,
-                            gpaths,
-                            device=device,
-                            batch_size=batch_size,
-                            amp_dtype=amp_dtype,
-                        )
+                            E_bg = embed_pil_images(
+                                model,
+                                preprocess,
+                                masked_bgs,
+                                device=device,
+                                batch_size=batch_size,
+                                amp_dtype=amp_dtype,
+                                desc=f"SigLIP bg {w_sz}x{h_sz}",
+                            )
+                        elif gkind == "square":
+                            assert norm_mod is not None
+                            masked_bgs = []
+                            for bg_p in gpaths:
+                                with Image.open(bg_p) as im:
+                                    masked_bgs.append(
+                                        _prepare_places_square_region(
+                                            norm_mod,
+                                            im,
+                                            x0,
+                                            y0,
+                                            side,
+                                            apply_same_square=apply_same_square,
+                                            drop_black=drop_black,
+                                        )
+                                    )
+                            E_bg = embed_pil_images(
+                                model,
+                                preprocess,
+                                masked_bgs,
+                                device=device,
+                                batch_size=batch_size,
+                                amp_dtype=amp_dtype,
+                                desc=f"SigLIP bg {w_sz}x{h_sz}",
+                            )
+                        else:
+                            E_bg = embed_image_paths(
+                                model,
+                                preprocess,
+                                gpaths,
+                                device=device,
+                                batch_size=batch_size,
+                                amp_dtype=amp_dtype,
+                            )
 
-                    cos_all = (E_bg @ E_places.t()).cpu().numpy()
-                    margin = None
-                    if min_margin is not None:
-                        margin = _second_best_margin(
-                            E_bg,
-                            E_places,
-                            chunk=matmul_chunk,
-                            device=device,
-                        )
+                    with tt.scope("places_cosine_matmul_and_margin"):
+                        cos_all = (E_bg @ E_places.t()).cpu().numpy()
+                        margin = None
+                        if min_margin is not None:
+                            margin = _second_best_margin(
+                                E_bg,
+                                E_places,
+                                chunk=matmul_chunk,
+                                device=device,
+                            )
 
                     if exact_pixel:
                         assert warped_stack is not None
-                        for j, bg_p in enumerate(gpaths):
-                            with Image.open(bg_p) as im:
-                                im_rgb = (
-                                    _prepare_places_square_region(
-                                        norm_mod,
-                                        im,
-                                        x0,
-                                        y0,
-                                        side,
-                                        apply_same_square=apply_same_square,
-                                        drop_black=drop_black,
-                                    )
-                                    if use_square_geom
-                                    else im.convert("RGB")
+                        with tt.scope("places_exact_pixel_tiebreak_loop"):
+                            for j, bg_p in enumerate(gpaths):
+                                with Image.open(bg_p) as im:
+                                    if gkind == "mask":
+                                        assert norm_mod is not None
+                                        im_rgb = _apply_places_fg_occlusion(
+                                            norm_mod,
+                                            im,
+                                            keep_mask_shape=True,
+                                            fg_path=fg_for_mask,
+                                            apply_same_square=False,
+                                            drop_black=False,
+                                            x0=0,
+                                            y0=0,
+                                            side=0,
+                                            warn_prefix=warn_p,
+                                        )
+                                    elif gkind == "square":
+                                        assert norm_mod is not None
+                                        im_rgb = _prepare_places_square_region(
+                                            norm_mod,
+                                            im,
+                                            x0,
+                                            y0,
+                                            side,
+                                            apply_same_square=apply_same_square,
+                                            drop_black=drop_black,
+                                        )
+                                    else:
+                                        im_rgb = im.convert("RGB")
+                                    bg_rgb = np.asarray(im_rgb, dtype=np.uint8)
+                                counts = _pixel_match_counts_vs_stack(
+                                    bg_rgb, warped_stack
                                 )
-                                bg_rgb = np.asarray(im_rgb, dtype=np.uint8)
-                            counts = _pixel_match_counts_vs_stack(
-                                bg_rgb, warped_stack
-                            )
-                            cos_vec = cos_all[j].astype(np.float64)
-                            order = np.lexsort(
-                                (cos_vec, counts.astype(np.int64))
-                            )
-                            fi = int(order[-1])
-                            sim = float(cos_vec[fi])
-                            row = {
-                                "group": group_name,
-                                "label": label,
-                                "bg_only_relpath": _to_rel(
-                                    bg_p, waterbirds_root
-                                ),
-                                "full_relpath": None,
-                                "place_relpath": _to_rel(
-                                    place_paths[fi], places_dir
-                                ),
-                                "cosine_similarity": sim,
-                                "exact_pixel_matches": int(counts[fi]),
-                                "match_target": "places365",
-                            }
-                            if margin is not None:
-                                row["best_minus_second"] = float(margin[j])
-                            rows_by_bg[bg_p] = row
+                                cos_vec = cos_all[j].astype(np.float64)
+                                order = np.lexsort(
+                                    (cos_vec, counts.astype(np.int64))
+                                )
+                                fi = int(order[-1])
+                                sim = float(cos_vec[fi])
+                                row = {
+                                    "group": group_name,
+                                    "label": label,
+                                    "bg_only_relpath": _to_rel(
+                                        bg_p, waterbirds_root
+                                    ),
+                                    "full_relpath": None,
+                                    "place_relpath": _to_rel(
+                                        place_paths[fi], places_dir
+                                    ),
+                                    "cosine_similarity": sim,
+                                    "exact_pixel_matches": int(counts[fi]),
+                                    "match_target": "places365",
+                                }
+                                if margin is not None:
+                                    row["best_minus_second"] = float(margin[j])
+                                rows_by_bg[bg_p] = row
                     else:
-                        best_idx, best_sim = _match_bg_to_full(
-                            E_bg, E_places, chunk=matmul_chunk, device=device
-                        )
-                        for j, bg_p in enumerate(gpaths):
-                            fi = int(best_idx[j])
-                            sim = float(best_sim[j])
-                            row = {
-                                "group": group_name,
-                                "label": label,
-                                "bg_only_relpath": _to_rel(
-                                    bg_p, waterbirds_root
-                                ),
-                                "full_relpath": None,
-                                "place_relpath": _to_rel(
-                                    place_paths[fi], places_dir
-                                ),
-                                "cosine_similarity": sim,
-                                "match_target": "places365",
-                            }
-                            if margin is not None:
-                                row["best_minus_second"] = float(margin[j])
-                            rows_by_bg[bg_p] = row
+                        with tt.scope("places_argmax_match_rows"):
+                            best_idx, best_sim = _match_bg_to_full(
+                                E_bg,
+                                E_places,
+                                chunk=matmul_chunk,
+                                device=device,
+                            )
+                            for j, bg_p in enumerate(gpaths):
+                                fi = int(best_idx[j])
+                                sim = float(best_sim[j])
+                                row = {
+                                    "group": group_name,
+                                    "label": label,
+                                    "bg_only_relpath": _to_rel(
+                                        bg_p, waterbirds_root
+                                    ),
+                                    "full_relpath": None,
+                                    "place_relpath": _to_rel(
+                                        place_paths[fi], places_dir
+                                    ),
+                                    "cosine_similarity": sim,
+                                    "match_target": "places365",
+                                }
+                                if margin is not None:
+                                    row["best_minus_second"] = float(margin[j])
+                                rows_by_bg[bg_p] = row
 
             for bg_p in bg_paths:
                 if bg_p not in rows_by_bg:
@@ -974,8 +1253,10 @@ def run_matching_places(
                     )
                 if debug and len(matches) >= DEBUG_MATCH_LIMIT:
                     meta["debug_early_stop"] = True
+                    warp_bar.close()
                     return matches, meta
 
+    warp_bar.close()
     return matches, meta
 
 
@@ -996,9 +1277,12 @@ def run_matching_original_to_places(
     class_label: Optional[str],
     apply_same_square: bool,
     drop_black: bool,
+    keep_mask_shape: bool,
     fg_only_root: str,
     debug: bool = False,
     debug_dir: str = "",
+    timer: Optional[MatchPhaseTimer] = None,
+    warp_progress: bool = True,
 ) -> Tuple[List[dict], dict]:
     """
     For each **original** FG+BG image (``landbird_on_land/0/*.jpg``, …), find the nearest
@@ -1010,14 +1294,19 @@ def run_matching_original_to_places(
     places_dir = os.path.abspath(places_dir)
     fg_only_root = os.path.abspath(fg_only_root)
     amp_dtype = torch.float16 if use_amp and device.type == "cuda" else None
-    use_square_geom = apply_same_square or drop_black
+    use_square_grouping = (
+        apply_same_square or drop_black
+    ) and not keep_mask_shape
+    need_norm_mod = use_square_grouping or keep_mask_shape
     dbg_out = os.path.abspath(debug_dir or "debug_match") if debug else ""
+    tt = timer or MatchPhaseTimer(False)
 
-    model, _, preprocess = open_clip.create_model_and_transforms(
-        model_id,
-        pretrained=pretrained,
-    )
-    model = model.to(device).eval()
+    with tt.scope("siglip_model_load"):
+        model, _, preprocess = open_clip.create_model_and_transforms(
+            model_id,
+            pretrained=pretrained,
+        )
+        model = model.to(device).eval()
 
     matches: List[dict] = []
     meta = {
@@ -1034,7 +1323,9 @@ def run_matching_original_to_places(
         "match_to_original": True,
         "apply_same_square": apply_same_square,
         "drop_black": drop_black,
-        "fg_only_root": fg_only_root if use_square_geom else None,
+        "keep_mask_shape": keep_mask_shape,
+        "fg_only_root": fg_only_root if need_norm_mod else None,
+        "warp_progress_bar": warp_progress,
     }
     if debug:
         meta["debug"] = True
@@ -1043,14 +1334,16 @@ def run_matching_original_to_places(
     labels: Tuple[str, ...] = (
         (class_label,) if class_label in ("0", "1") else ("0", "1")
     )
+    warp_bar = PlacesWarpProgressBar(warp_progress)
 
     pool_emb_cache: Dict[
         Tuple[int, ...], Tuple[torch.Tensor, Optional[np.ndarray]]
     ] = {}
 
-    norm_mod = (
-        _load_wb_normalize_resolution_module() if use_square_geom else None
-    )
+    norm_mod = None
+    if need_norm_mod:
+        with tt.scope("wb_normalize_module_load"):
+            norm_mod = _load_wb_normalize_resolution_module()
 
     for gid, group_name in enumerate(GROUP_SUBDIRS):
         pool_idx = _places_pool_index_for_group(group_name)
@@ -1082,7 +1375,29 @@ def run_matching_original_to_places(
             rows_by_orig: Dict[str, dict] = {}
 
             for (w_sz, h_sz), bucket_paths in sorted(buckets.items()):
-                if use_square_geom:
+                warn_p = f"{group_name}/{label}"
+                group_specs: List[Tuple[str, object, List[str]]] = []
+                if keep_mask_shape:
+                    assert norm_mod is not None
+                    mask_groups: Dict[str, List[str]] = defaultdict(list)
+                    for orig_p in bucket_paths:
+                        bn = os.path.basename(orig_p)
+                        fg_p = norm_mod.resolve_fg_only_image_path(
+                            waterbirds_root,
+                            fg_only_root,
+                            gid,
+                            label,
+                            bn,
+                        )
+                        fk = (
+                            os.path.abspath(fg_p)
+                            if fg_p and os.path.isfile(fg_p)
+                            else "__no_fg__"
+                        )
+                        mask_groups[fk].append(orig_p)
+                    for fk, gp in mask_groups.items():
+                        group_specs.append(("mask", fk, gp))
+                elif use_square_grouping:
                     assert norm_mod is not None
                     square_groups: Dict[
                         Tuple[int, int, int], List[str]
@@ -1102,53 +1417,96 @@ def run_matching_original_to_places(
                             gid=gid,
                             label=label,
                             basename=bn,
-                            warn_prefix=f"{group_name}/{label}",
+                            warn_prefix=warn_p,
                         )
                         square_groups[(x0, y0, side)].append(orig_p)
-                    group_iter = list(square_groups.items())
+                    for sq, gp in square_groups.items():
+                        group_specs.append(("square", sq, gp))
                 else:
-                    group_iter = [((0, 0, 0), bucket_paths)]
+                    group_specs.append(("plain", None, bucket_paths))
 
-                for (x0, y0, side), gpaths in group_iter:
-                    ck: Tuple[int, ...] = (
-                        (pool_idx, w_sz, h_sz, x0, y0, side)
-                        if use_square_geom
-                        else (pool_idx, w_sz, h_sz)
-                    )
+                for gkind, ginfo, gpaths in group_specs:
+                    x0 = y0 = side = 0
+                    fg_for_mask: Optional[str] = None
+                    if gkind == "mask":
+                        fg_key = str(ginfo)
+                        ck = (pool_idx, w_sz, h_sz, "mask", fg_key)
+                        fg_for_mask = None if fg_key == "__no_fg__" else fg_key
+                    elif gkind == "square":
+                        assert isinstance(ginfo, tuple)
+                        x0, y0, side = ginfo  # type: ignore[misc]
+                        ck = (pool_idx, w_sz, h_sz, x0, y0, side)
+                    else:
+                        ck = (pool_idx, w_sz, h_sz)
+
                     if ck not in pool_emb_cache:
                         warped_pils: List[Image.Image] = []
                         warped_rgbs: List[np.ndarray] = []
-                        for pp in tqdm(
-                            place_paths,
-                            desc=f"Places warp orig {group_name}/{label} {w_sz}x{h_sz}",
-                            leave=False,
-                        ):
-                            pil = place_background_from_file(pp, w_sz, h_sz)
-                            if use_square_geom:
-                                assert norm_mod is not None
-                                pil = _prepare_places_square_region(
-                                    norm_mod,
-                                    pil,
-                                    x0,
-                                    y0,
-                                    side,
-                                    apply_same_square=apply_same_square,
-                                    drop_black=drop_black,
-                                )
-                            warped_pils.append(pil)
-                            if exact_pixel:
-                                warped_rgbs.append(
-                                    np.asarray(pil, dtype=np.uint8)
-                                )
-                        E_pl = embed_pil_images(
-                            model,
-                            preprocess,
-                            warped_pils,
-                            device=device,
-                            batch_size=batch_size,
-                            amp_dtype=amp_dtype,
-                            desc=f"SigLIP Places orig {w_sz}x{h_sz}",
+                        warp_bar.on_cache_miss(
+                            len(place_paths),
+                            f"{group_name}/{label} {w_sz}x{h_sz}",
                         )
+                        use_wp = warp_bar.is_active()
+                        place_iter = (
+                            place_paths
+                            if use_wp
+                            else tqdm(
+                                place_paths,
+                                desc=(
+                                    f"Places warp orig {group_name}/{label} "
+                                    f"{w_sz}x{h_sz}"
+                                ),
+                                leave=False,
+                            )
+                        )
+                        with tt.scope("places_warp_pool_to_canvas"):
+                            for pp in place_iter:
+                                pil = place_background_from_file(pp, w_sz, h_sz)
+                                if gkind == "mask":
+                                    assert norm_mod is not None
+                                    pil = _apply_places_fg_occlusion(
+                                        norm_mod,
+                                        pil,
+                                        keep_mask_shape=True,
+                                        fg_path=fg_for_mask,
+                                        apply_same_square=False,
+                                        drop_black=False,
+                                        x0=0,
+                                        y0=0,
+                                        side=0,
+                                        warn_prefix=warn_p,
+                                    )
+                                elif gkind == "square":
+                                    assert norm_mod is not None
+                                    pil = _prepare_places_square_region(
+                                        norm_mod,
+                                        pil,
+                                        x0,
+                                        y0,
+                                        side,
+                                        apply_same_square=apply_same_square,
+                                        drop_black=drop_black,
+                                    )
+                                else:
+                                    pil = pil.convert("RGB")
+                                warped_pils.append(pil)
+                                if exact_pixel:
+                                    warped_rgbs.append(
+                                        np.asarray(pil, dtype=np.uint8)
+                                    )
+                                if use_wp:
+                                    warp_bar.step()
+                        with tt.scope("places_embed_warped_pool_siglip"):
+                            E_pl = embed_pil_images(
+                                model,
+                                preprocess,
+                                warped_pils,
+                                device=device,
+                                batch_size=batch_size,
+                                amp_dtype=amp_dtype,
+                                desc=f"SigLIP Places orig {w_sz}x{h_sz}",
+                                disable_batch_progress=use_wp,
+                            )
                         w_stack: Optional[np.ndarray] = None
                         if exact_pixel:
                             w_stack = np.stack(warped_rgbs, axis=0)
@@ -1156,118 +1514,169 @@ def run_matching_original_to_places(
 
                     E_places, warped_stack = pool_emb_cache[ck]
 
-                    if use_square_geom:
-                        assert norm_mod is not None
-                        masked_orig: List[Image.Image] = []
-                        for orig_p in gpaths:
-                            with Image.open(orig_p) as im:
-                                masked_orig.append(
-                                    _prepare_places_square_region(
-                                        norm_mod,
-                                        im,
-                                        x0,
-                                        y0,
-                                        side,
-                                        apply_same_square=apply_same_square,
-                                        drop_black=drop_black,
+                    with tt.scope("places_prepare_and_embed_queries"):
+                        if gkind == "mask":
+                            assert norm_mod is not None
+                            masked_orig: List[Image.Image] = []
+                            for orig_p in gpaths:
+                                with Image.open(orig_p) as im:
+                                    masked_orig.append(
+                                        _apply_places_fg_occlusion(
+                                            norm_mod,
+                                            im,
+                                            keep_mask_shape=True,
+                                            fg_path=fg_for_mask,
+                                            apply_same_square=False,
+                                            drop_black=False,
+                                            x0=0,
+                                            y0=0,
+                                            side=0,
+                                            warn_prefix=warn_p,
+                                        )
                                     )
-                                )
-                        E_orig = embed_pil_images(
-                            model,
-                            preprocess,
-                            masked_orig,
-                            device=device,
-                            batch_size=batch_size,
-                            amp_dtype=amp_dtype,
-                            desc=f"SigLIP orig {w_sz}x{h_sz}",
-                        )
-                    else:
-                        E_orig = embed_image_paths(
-                            model,
-                            preprocess,
-                            gpaths,
-                            device=device,
-                            batch_size=batch_size,
-                            amp_dtype=amp_dtype,
-                        )
+                            E_orig = embed_pil_images(
+                                model,
+                                preprocess,
+                                masked_orig,
+                                device=device,
+                                batch_size=batch_size,
+                                amp_dtype=amp_dtype,
+                                desc=f"SigLIP orig {w_sz}x{h_sz}",
+                            )
+                        elif gkind == "square":
+                            assert norm_mod is not None
+                            masked_orig = []
+                            for orig_p in gpaths:
+                                with Image.open(orig_p) as im:
+                                    masked_orig.append(
+                                        _prepare_places_square_region(
+                                            norm_mod,
+                                            im,
+                                            x0,
+                                            y0,
+                                            side,
+                                            apply_same_square=apply_same_square,
+                                            drop_black=drop_black,
+                                        )
+                                    )
+                            E_orig = embed_pil_images(
+                                model,
+                                preprocess,
+                                masked_orig,
+                                device=device,
+                                batch_size=batch_size,
+                                amp_dtype=amp_dtype,
+                                desc=f"SigLIP orig {w_sz}x{h_sz}",
+                            )
+                        else:
+                            E_orig = embed_image_paths(
+                                model,
+                                preprocess,
+                                gpaths,
+                                device=device,
+                                batch_size=batch_size,
+                                amp_dtype=amp_dtype,
+                            )
 
-                    cos_all = (E_orig @ E_places.t()).cpu().numpy()
-                    margin = None
-                    if min_margin is not None:
-                        margin = _second_best_margin(
-                            E_orig,
-                            E_places,
-                            chunk=matmul_chunk,
-                            device=device,
-                        )
+                    with tt.scope("places_cosine_matmul_and_margin"):
+                        cos_all = (E_orig @ E_places.t()).cpu().numpy()
+                        margin = None
+                        if min_margin is not None:
+                            margin = _second_best_margin(
+                                E_orig,
+                                E_places,
+                                chunk=matmul_chunk,
+                                device=device,
+                            )
 
                     if exact_pixel:
                         assert warped_stack is not None
-                        for j, orig_p in enumerate(gpaths):
-                            with Image.open(orig_p) as im:
-                                im_rgb = (
-                                    _prepare_places_square_region(
-                                        norm_mod,
-                                        im,
-                                        x0,
-                                        y0,
-                                        side,
-                                        apply_same_square=apply_same_square,
-                                        drop_black=drop_black,
+                        with tt.scope("places_exact_pixel_tiebreak_loop"):
+                            for j, orig_p in enumerate(gpaths):
+                                with Image.open(orig_p) as im:
+                                    if gkind == "mask":
+                                        assert norm_mod is not None
+                                        im_rgb = _apply_places_fg_occlusion(
+                                            norm_mod,
+                                            im,
+                                            keep_mask_shape=True,
+                                            fg_path=fg_for_mask,
+                                            apply_same_square=False,
+                                            drop_black=False,
+                                            x0=0,
+                                            y0=0,
+                                            side=0,
+                                            warn_prefix=warn_p,
+                                        )
+                                    elif gkind == "square":
+                                        assert norm_mod is not None
+                                        im_rgb = _prepare_places_square_region(
+                                            norm_mod,
+                                            im,
+                                            x0,
+                                            y0,
+                                            side,
+                                            apply_same_square=apply_same_square,
+                                            drop_black=drop_black,
+                                        )
+                                    else:
+                                        im_rgb = im.convert("RGB")
+                                    orig_rgb = np.asarray(
+                                        im_rgb, dtype=np.uint8
                                     )
-                                    if use_square_geom
-                                    else im.convert("RGB")
+                                counts = _pixel_match_counts_vs_stack(
+                                    orig_rgb, warped_stack
                                 )
-                                orig_rgb = np.asarray(im_rgb, dtype=np.uint8)
-                            counts = _pixel_match_counts_vs_stack(
-                                orig_rgb, warped_stack
-                            )
-                            cos_vec = cos_all[j].astype(np.float64)
-                            order = np.lexsort(
-                                (cos_vec, counts.astype(np.int64))
-                            )
-                            fi = int(order[-1])
-                            sim = float(cos_vec[fi])
-                            row = {
-                                "group": group_name,
-                                "label": label,
-                                "bg_only_relpath": None,
-                                "full_relpath": _to_rel(
-                                    orig_p, waterbirds_root
-                                ),
-                                "place_relpath": _to_rel(
-                                    place_paths[fi], places_dir
-                                ),
-                                "cosine_similarity": sim,
-                                "exact_pixel_matches": int(counts[fi]),
-                                "match_target": "original_to_places365",
-                            }
-                            if margin is not None:
-                                row["best_minus_second"] = float(margin[j])
-                            rows_by_orig[orig_p] = row
+                                cos_vec = cos_all[j].astype(np.float64)
+                                order = np.lexsort(
+                                    (cos_vec, counts.astype(np.int64))
+                                )
+                                fi = int(order[-1])
+                                sim = float(cos_vec[fi])
+                                row = {
+                                    "group": group_name,
+                                    "label": label,
+                                    "bg_only_relpath": None,
+                                    "full_relpath": _to_rel(
+                                        orig_p, waterbirds_root
+                                    ),
+                                    "place_relpath": _to_rel(
+                                        place_paths[fi], places_dir
+                                    ),
+                                    "cosine_similarity": sim,
+                                    "exact_pixel_matches": int(counts[fi]),
+                                    "match_target": "original_to_places365",
+                                }
+                                if margin is not None:
+                                    row["best_minus_second"] = float(margin[j])
+                                rows_by_orig[orig_p] = row
                     else:
-                        best_idx, best_sim = _match_bg_to_full(
-                            E_orig, E_places, chunk=matmul_chunk, device=device
-                        )
-                        for j, orig_p in enumerate(gpaths):
-                            fi = int(best_idx[j])
-                            sim = float(best_sim[j])
-                            row = {
-                                "group": group_name,
-                                "label": label,
-                                "bg_only_relpath": None,
-                                "full_relpath": _to_rel(
-                                    orig_p, waterbirds_root
-                                ),
-                                "place_relpath": _to_rel(
-                                    place_paths[fi], places_dir
-                                ),
-                                "cosine_similarity": sim,
-                                "match_target": "original_to_places365",
-                            }
-                            if margin is not None:
-                                row["best_minus_second"] = float(margin[j])
-                            rows_by_orig[orig_p] = row
+                        with tt.scope("places_argmax_match_rows"):
+                            best_idx, best_sim = _match_bg_to_full(
+                                E_orig,
+                                E_places,
+                                chunk=matmul_chunk,
+                                device=device,
+                            )
+                            for j, orig_p in enumerate(gpaths):
+                                fi = int(best_idx[j])
+                                sim = float(best_sim[j])
+                                row = {
+                                    "group": group_name,
+                                    "label": label,
+                                    "bg_only_relpath": None,
+                                    "full_relpath": _to_rel(
+                                        orig_p, waterbirds_root
+                                    ),
+                                    "place_relpath": _to_rel(
+                                        place_paths[fi], places_dir
+                                    ),
+                                    "cosine_similarity": sim,
+                                    "match_target": "original_to_places365",
+                                }
+                                if margin is not None:
+                                    row["best_minus_second"] = float(margin[j])
+                                rows_by_orig[orig_p] = row
 
             for orig_p in orig_paths:
                 if orig_p not in rows_by_orig:
@@ -1287,8 +1696,10 @@ def run_matching_original_to_places(
                     )
                 if debug and len(matches) >= DEBUG_MATCH_LIMIT:
                     meta["debug_early_stop"] = True
+                    warp_bar.close()
                     return matches, meta
 
+    warp_bar.close()
     return matches, meta
 
 
@@ -1439,15 +1850,29 @@ def main() -> None:
         help=(
             "Places matching only: before SigLIP (and exact-pixel tie-break), paint the same "
             "black square as for the paired full FG+BG frame (FG mask when available, else "
-            "centered min(w,h)//2) onto each warped Places crop and each query image."
+            "centered min(w,h)//2) onto each warped Places crop and each query image. "
+            "If --keep-mask-shape is also set, the bird-shaped FG mask is used instead of "
+            "that rectangle."
+        ),
+    )
+    parser.add_argument(
+        "--keep-mask-shape",
+        action="store_true",
+        help=(
+            "Places matching only: black out the **bird-shaped** foreground from the paired "
+            "``*_fg_only`` image (Hub or --fg-only-root), like normalize_waterbirds "
+            "``--keep-mask-shape`` — not the smallest covering square. If no FG-only file is "
+            "found for a basename, leaves the canvas unchanged (same as the normalize script). "
+            "Overrides rectangle painting when combined with --apply-same-square. "
+            "Incompatible with --drop-black."
         ),
     )
     parser.add_argument(
         "--fg-only-root",
         default=None,
         help=(
-            "With --apply-same-square or --drop-black: legacy FG-Only tree root "
-            "(``test_split/group_<id>/``). Default: ``<--waterbirds-root>/FG-Only``. "
+            "With --apply-same-square, --drop-black, or --keep-mask-shape: legacy FG-Only "
+            "tree root (``test_split/group_<id>/``). Default: ``<--waterbirds-root>/FG-Only``. "
             "Hub ``*_fg_only`` is tried first."
         ),
     )
@@ -1472,6 +1897,22 @@ def main() -> None:
             "Skips ``--min-best-minus-second`` filtering so all three rows are kept."
         ),
     )
+    parser.add_argument(
+        "--verbose-timing",
+        action="store_true",
+        help=(
+            "Print per-phase wall times to stderr as the run progresses (see also "
+            '``meta["timings_s"]`` in the output JSON, always written).'
+        ),
+    )
+    parser.add_argument(
+        "--no-warp-progress",
+        action="store_true",
+        help=(
+            "Places matching only: disable the global stderr tqdm bar that counts each "
+            "Places→canvas warp (and shows how many warps remain). Default: bar enabled."
+        ),
+    )
     args = parser.parse_args()
 
     if args.apply_same_square and not (
@@ -1484,6 +1925,15 @@ def main() -> None:
         parser.error(
             "--drop-black is only valid with --search-places or --match-to-original"
         )
+    if args.keep_mask_shape and not (
+        args.search_places or args.match_to_original
+    ):
+        parser.error(
+            "--keep-mask-shape is only valid with --search-places or "
+            "--match-to-original"
+        )
+    if args.keep_mask_shape and args.drop_black:
+        parser.error("--keep-mask-shape cannot be combined with --drop-black")
 
     if args.search_places and args.match_to_original:
         parser.error(
@@ -1506,6 +1956,9 @@ def main() -> None:
     )
     dbg_dir = os.path.abspath("debug_match") if args.debug else ""
 
+    wall0 = time.perf_counter()
+    phase_timer = MatchPhaseTimer(verbose=args.verbose_timing)
+
     if args.search_places:
         matches, meta = run_matching_places(
             args.waterbirds_root,
@@ -1523,9 +1976,12 @@ def main() -> None:
             class_label=args.class_label,
             apply_same_square=args.apply_same_square,
             drop_black=args.drop_black,
+            keep_mask_shape=args.keep_mask_shape,
             fg_only_root=fg_only_root,
             debug=args.debug,
             debug_dir=dbg_dir,
+            timer=phase_timer,
+            warp_progress=not args.no_warp_progress,
         )
     elif args.match_to_original:
         matches, meta = run_matching_original_to_places(
@@ -1544,9 +2000,12 @@ def main() -> None:
             class_label=args.class_label,
             apply_same_square=args.apply_same_square,
             drop_black=args.drop_black,
+            keep_mask_shape=args.keep_mask_shape,
             fg_only_root=fg_only_root,
             debug=args.debug,
             debug_dir=dbg_dir,
+            timer=phase_timer,
+            warp_progress=not args.no_warp_progress,
         )
     else:
         matches, meta = run_matching(
@@ -1562,20 +2021,22 @@ def main() -> None:
             class_label=args.class_label,
             debug=args.debug,
             debug_dir=dbg_dir,
+            timer=phase_timer,
         )
 
     if args.min_best_minus_second is not None and not args.debug:
-        before = len(matches)
-        matches = [
-            m
-            for m in matches
-            if m.get("best_minus_second", 1.0) >= args.min_best_minus_second
-        ]
-        meta["filtered_by_margin"] = {
-            "threshold": args.min_best_minus_second,
-            "before": before,
-            "after": len(matches),
-        }
+        with phase_timer.scope("post_match_margin_filter"):
+            before = len(matches)
+            matches = [
+                m
+                for m in matches
+                if m.get("best_minus_second", 1.0) >= args.min_best_minus_second
+            ]
+            meta["filtered_by_margin"] = {
+                "threshold": args.min_best_minus_second,
+                "before": before,
+                "after": len(matches),
+            }
 
     summary = _summarize(matches)
     mapping = {}
@@ -1591,18 +2052,38 @@ def main() -> None:
         if "exact_pixel_matches" in m:
             entry["exact_pixel_matches"] = m["exact_pixel_matches"]
         mapping[map_key] = entry
-    payload = {
-        "meta": meta,
-        "summary": summary,
-        "mapping": mapping,
-        "matches": matches,
-    }
+
+    if args.csv:
+        with phase_timer.scope("write_csv_output"):
+            os.makedirs(
+                os.path.dirname(os.path.abspath(args.csv)) or ".",
+                exist_ok=True,
+            )
+            if matches:
+                fieldnames = list(matches[0].keys())
+                with open(args.csv, "w", encoding="utf-8", newline="") as f:
+                    w = csv.DictWriter(f, fieldnames=fieldnames)
+                    w.writeheader()
+                    w.writerows(matches)
+            else:
+                with open(args.csv, "w", encoding="utf-8") as f:
+                    f.write("")
+        print(f"Wrote CSV to {args.csv!r}")
 
     os.makedirs(
         os.path.dirname(os.path.abspath(args.output)) or ".", exist_ok=True
     )
-    with open(args.output, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2)
+    with phase_timer.scope("write_json_output"):
+        meta["timings_s"] = phase_timer.as_meta_dict()
+        meta["wall_clock_total_s"] = round(time.perf_counter() - wall0, 4)
+        payload = {
+            "meta": meta,
+            "summary": summary,
+            "mapping": mapping,
+            "matches": matches,
+        }
+        with open(args.output, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
     print(f"Wrote {len(matches)} matches to {args.output!r}")
     if args.search_places:
         tail = "matched targets with >1 bg_only pointing to them"
@@ -1611,21 +2092,10 @@ def main() -> None:
     else:
         tail = "full-image targets with >1 bg_only pointing to them"
     print(f"{tail}: {summary['num_full_targets_with_multiple_bg']}")
-
-    if args.csv:
-        os.makedirs(
-            os.path.dirname(os.path.abspath(args.csv)) or ".", exist_ok=True
-        )
-        if matches:
-            fieldnames = list(matches[0].keys())
-            with open(args.csv, "w", encoding="utf-8", newline="") as f:
-                w = csv.DictWriter(f, fieldnames=fieldnames)
-                w.writeheader()
-                w.writerows(matches)
-        else:
-            with open(args.csv, "w", encoding="utf-8") as f:
-                f.write("")
-        print(f"Wrote CSV to {args.csv!r}")
+    print(
+        f"Wall clock {meta['wall_clock_total_s']:.2f}s "
+        f"(phase totals in JSON meta['timings_s'])."
+    )
 
 
 if __name__ == "__main__":

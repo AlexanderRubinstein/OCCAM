@@ -13,19 +13,22 @@ usage() {
   printf '%s\n' \
     "Run match_waterbirds_bg_only_to_full_siglip.py in the background; logs to matching_logs.log." \
     "" \
-    "Usage: $(basename "$0") [-e DIR | -p PATH] [--exact-pixel] [--debug] [--class 0|1]" \
-    "  [--search-places|--match-to-original] [--places-dir DIR] [--apply-same-square] [--drop-black] [--fg-only-root DIR]" \
+    "Usage: $(basename "$0") [-e DIR | -p PATH] [--exact-pixel] [--debug] [--verbose-timing] [--no-warp-progress] [--class 0|1]" \
+    "  [--search-places|--match-to-original] [--places-dir DIR] [--apply-same-square] [--keep-mask-shape] [--drop-black] [--fg-only-root DIR]" \
     "  -e, --venv DIR     Virtualenv root (runs DIR/bin/python)" \
     "  -p, --python PATH  Python interpreter to use" \
     "  --exact-pixel      Forward to Python (pixel-then-SigLIP matching)" \
     "  --debug            Forward to Python (stop after 3 matches; copies under ./debug_match/)" \
+    "  --verbose-timing   Forward to Python (stderr [timing] lines; meta['timings_s'] always in JSON)" \
+    "  --no-warp-progress Forward to Python (disable global Places warp tqdm bar on stderr)" \
     "  --class N          Forward to Python; N is 0 or 1 (one coarse label only)" \
     "  --search-places    Forward to Python (match bg_only to warped Places365 pool)" \
     "  --match-to-original Forward to Python (match each FG+BG image to nearest Places pool)" \
     "  --places-dir DIR   Forward to Python (required with Places modes)" \
     "  --apply-same-square Forward to Python (Places: same black square as paired full before SigLIP)" \
+    "  --keep-mask-shape  Forward to Python (Places: bird-shaped FG mask instead of covering square)" \
     "  --drop-black       Forward to Python (Places: splice out FG square before SigLIP)" \
-    "  --fg-only-root DIR Forward to Python (with --apply-same-square/--drop-black; default <Waterbirds>/FG-Only)" \
+    "  --fg-only-root DIR Forward to Python (Places FG layout; default <Waterbirds>/FG-Only)" \
     "  -h, --help         Show this help" \
     "" \
     "If -e / -p are omitted, uses PYTHON, OCCAM_PYTHON, or repo env heuristics." \
@@ -65,6 +68,14 @@ while [[ $# -gt 0 ]]; do
       EXTRA_ARGS+=(--debug)
       shift
       ;;
+    --verbose-timing)
+      EXTRA_ARGS+=(--verbose-timing)
+      shift
+      ;;
+    --no-warp-progress)
+      EXTRA_ARGS+=(--no-warp-progress)
+      shift
+      ;;
     --class)
       [[ -n "${2:-}" ]] || {
         printf '%s\n' "ERROR: --class requires 0 or 1" >&2
@@ -98,6 +109,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --apply-same-square)
       EXTRA_ARGS+=(--apply-same-square)
+      shift
+      ;;
+    --keep-mask-shape)
+      EXTRA_ARGS+=(--keep-mask-shape)
       shift
       ;;
     --drop-black)

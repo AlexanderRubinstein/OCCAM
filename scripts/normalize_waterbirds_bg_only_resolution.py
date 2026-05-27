@@ -10,7 +10,8 @@ one warp size per canvas pool.
   backgrounds when you use one command.
 
 Requires Pillow, tqdm, and NumPy. Optional ``--match-fg-size`` uses FG-only images to
-position the black square (see ``--fg-only-root``).
+position the black square (see ``--fg-only-root``). ``--inpaint`` needs OpenCV
+(``opencv-python-headless``).
 
 Examples:
 
@@ -47,6 +48,11 @@ Examples:
   # Write at most 2 images per label folder under ``<scenario>_debug/<label>/`` (no in-place writes):
   python scripts/normalize_waterbirds_bg_only_resolution.py \\
     --waterbirds-root data/datasets/Waterbirds --width 224 --height 224 --targets full --debug
+
+  # Fill masked regions via OpenCV inpainting instead of black (requires a mask flag):
+  python scripts/normalize_waterbirds_bg_only_resolution.py \\
+    --waterbirds-root data/datasets/Waterbirds --width 224 --height 224 \\
+    --targets full --keep-mask-shape --inpaint --inpaint-radius 5
 """
 
 from __future__ import annotations
@@ -209,6 +215,114 @@ def _square_covering_bbox(
     return x0, y0, side
 
 
+def _square_region_mask(
+    w: int, h: int, x0: int, y0: int, side: int
+) -> np.ndarray:
+    """Boolean mask ``True`` inside the axis-aligned square (same geometry as ``ImageDraw``)."""
+    m = np.zeros((h, w), dtype=bool)
+    if side < 1:
+        return m
+    x0c = max(0, min(int(x0), w - 1))
+    y0c = max(0, min(int(y0), h - 1))
+    side_i = max(0, min(int(side), w - x0c, h - y0c))
+    if side_i < 1:
+        return m
+    m[y0c : y0c + side_i, x0c : x0c + side_i] = True
+    return m
+
+
+def center_half_square_mask_hw(w: int, h: int) -> np.ndarray:
+    """Centered square of side ``min(w,h)//2`` (matches ``mask_center_square_half_short_side``)."""
+    x0, y0, side = center_black_square_params(w, h)
+    return _square_region_mask(w, h, x0, y0, side)
+
+
+def bird_mask_bool_from_fg_path(
+    w: int,
+    h: int,
+    fg_path: str,
+    *,
+    warn_prefix: str,
+) -> np.ndarray | None:
+    """Foreground (bird) mask from FG-only image, or ``None`` if mask is empty."""
+    with Image.open(fg_path) as fg_src:
+        fg = fg_src.copy()
+        if fg.size != (w, h):
+            fg = fg.resize((w, h), Image.Resampling.NEAREST)
+    mask = _foreground_mask_bool(fg)
+    if not bool(np.any(mask)):
+        print(
+            f"{warn_prefix}: empty foreground mask in {fg_path!r}; skipping bird mask.",
+            file=sys.stderr,
+        )
+        return None
+    return mask
+
+
+def square_mask_from_fg_path(
+    w: int,
+    h: int,
+    fg_path: str,
+    *,
+    warn_prefix: str,
+) -> np.ndarray:
+    """Smallest square covering FG mask, else centered half-size square."""
+    with Image.open(fg_path) as fg_src:
+        fg = fg_src.copy()
+        if fg.size != (w, h):
+            fg = fg.resize((w, h), Image.Resampling.NEAREST)
+    fmask = _foreground_mask_bool(fg)
+    bbox = _bbox_from_mask(fmask)
+    if bbox is None:
+        print(
+            f"{warn_prefix}: empty foreground mask in {fg_path!r}; "
+            f"falling back to centered half-size square.",
+            file=sys.stderr,
+        )
+        return center_half_square_mask_hw(w, h)
+    minx, miny, maxx, maxy = bbox
+    x0, y0, side = _square_covering_bbox(minx, miny, maxx, maxy, w, h)
+    return _square_region_mask(w, h, x0, y0, side)
+
+
+def fill_masked(
+    im: Image.Image,
+    mask: np.ndarray,
+    *,
+    use_inpaint: bool,
+    inpaint_radius: float,
+) -> Image.Image:
+    """
+    For every ``mask`` pixel that is true, either set RGB to black or inpaint from
+    surrounding background (OpenCV Telea) when ``use_inpaint`` is true.
+    """
+    rgb = np.asarray(im.convert("RGB"), dtype=np.uint8)
+    m = np.asarray(mask, dtype=bool)
+    if not np.any(m):
+        return im.convert("RGB")
+    if not use_inpaint:
+        out = rgb.copy()
+        out[m] = 0
+        return Image.fromarray(out)
+    try:
+        import cv2
+    except ImportError as e:  # pragma: no cover
+        raise SystemExit(
+            "--inpaint requires OpenCV. Install with: pip install opencv-python-headless"
+        ) from e
+    mask_u8 = m.astype(np.uint8) * 255
+    bgr = cv2.cvtColor(np.ascontiguousarray(rgb), cv2.COLOR_RGB2BGR)
+    mask_u8 = np.ascontiguousarray(mask_u8)
+    result = cv2.inpaint(
+        bgr,
+        mask_u8,
+        float(inpaint_radius),
+        flags=cv2.INPAINT_TELEA,
+    )
+    rgb_out = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
+    return Image.fromarray(rgb_out)
+
+
 def mask_square_from_fg_alignment(
     im: Image.Image,
     fg_path: str,
@@ -219,24 +333,9 @@ def mask_square_from_fg_alignment(
     Black out the smallest square that fully covers the foreground, using ``fg_path``
     (same canvas size as ``im``, or resized to match).
     """
-    rgb = im.convert("RGB")
-    w, h = rgb.size
-    with Image.open(fg_path) as fg_src:
-        fg = fg_src.copy()
-        if fg.size != (w, h):
-            fg = fg.resize((w, h), Image.Resampling.NEAREST)
-    mask = _foreground_mask_bool(fg)
-    bbox = _bbox_from_mask(mask)
-    if bbox is None:
-        print(
-            f"{warn_prefix}: empty foreground mask in {fg_path!r}; "
-            f"falling back to centered half-size square.",
-            file=sys.stderr,
-        )
-        return mask_center_square_half_short_side(rgb)
-    minx, miny, maxx, maxy = bbox
-    x0, y0, side = _square_covering_bbox(minx, miny, maxx, maxy, w, h)
-    return apply_black_square_coords(rgb, x0, y0, side)
+    w, h = im.size
+    mask = square_mask_from_fg_path(w, h, fg_path, warn_prefix=warn_prefix)
+    return fill_masked(im, mask, use_inpaint=False, inpaint_radius=0.0)
 
 
 def center_black_square_params(w: int, h: int) -> tuple[int, int, int]:
@@ -397,22 +496,11 @@ def mask_bird_shape_from_fg(
     Set pixels to black where the paired FG-only image indicates foreground (bird shape),
     not an axis-aligned bounding square.
     """
-    rgb = im.convert("RGB")
-    w, h = rgb.size
-    with Image.open(fg_path) as fg_src:
-        fg = fg_src.copy()
-        if fg.size != (w, h):
-            fg = fg.resize((w, h), Image.Resampling.NEAREST)
-    mask = _foreground_mask_bool(fg)
-    if not bool(np.any(mask)):
-        print(
-            f"{warn_prefix}: empty foreground mask in {fg_path!r}; leaving image unchanged.",
-            file=sys.stderr,
-        )
-        return rgb
-    arr = np.asarray(rgb, dtype=np.uint8).copy()
-    arr[mask] = 0
-    return Image.fromarray(arr)
+    w, h = im.size
+    mask = bird_mask_bool_from_fg_path(w, h, fg_path, warn_prefix=warn_prefix)
+    if mask is None:
+        return im.convert("RGB")
+    return fill_masked(im, mask, use_inpaint=False, inpaint_radius=0.0)
 
 
 def mask_center_square_half_short_side(im: Image.Image) -> Image.Image:
@@ -422,12 +510,9 @@ def mask_center_square_half_short_side(im: Image.Image) -> Image.Image:
     Intended for composites that have a solid gray plate in the middle (~half the
     shorter image dimension per side of the square); this removes it before resize.
     """
-    rgb = im.convert("RGB")
-    w, h = rgb.size
-    x0, y0, side = center_black_square_params(w, h)
-    if side < 1:
-        return rgb
-    return apply_black_square_coords(rgb, x0, y0, side)
+    w, h = im.size
+    mask = center_half_square_mask_hw(w, h)
+    return fill_masked(im, mask, use_inpaint=False, inpaint_radius=0.0)
 
 
 def normalize_to_canvas(
@@ -551,6 +636,22 @@ def main() -> None:
             "paths are always tried first."
         ),
     )
+    p.add_argument(
+        "--inpaint",
+        action="store_true",
+        help=(
+            "After building the removal mask (--gray-square, --match-fg-size, or "
+            "--keep-mask-shape), fill masked pixels with OpenCV Telea inpainting from "
+            "neighboring background instead of black. Requires opencv-python-headless."
+        ),
+    )
+    p.add_argument(
+        "--inpaint-radius",
+        type=float,
+        default=4.0,
+        metavar="R",
+        help="Radius passed to cv2.inpaint (default: 4). Only used with --inpaint.",
+    )
     args = p.parse_args()
     tw, th = args.width, args.height
     if tw < 1 or th < 1:
@@ -560,6 +661,12 @@ def main() -> None:
     if args.keep_mask_shape and (args.gray_square or args.match_fg_size):
         p.error(
             "--keep-mask-shape cannot be combined with --gray-square or --match-fg-size"
+        )
+    if args.inpaint and not (
+        args.gray_square or args.match_fg_size or args.keep_mask_shape
+    ):
+        p.error(
+            "--inpaint requires one of --gray-square, --match-fg-size, or --keep-mask-shape"
         )
     if args.debug and args.dry_run:
         p.error("--debug and --dry-run cannot be used together")
@@ -614,6 +721,8 @@ def main() -> None:
                 for fp in tqdm(paths, desc=desc, leave=False):
                     with Image.open(fp) as src:
                         im = src.convert("RGB")
+                        w0, h0 = im.size
+                        mask: np.ndarray | None = None
                         if args.keep_mask_shape:
                             bn = os.path.basename(fp)
                             fg_p = resolve_fg_only_image_path(
@@ -626,8 +735,8 @@ def main() -> None:
                                     file=sys.stderr,
                                 )
                             else:
-                                im = mask_bird_shape_from_fg(
-                                    im, fg_p, warn_prefix=desc
+                                mask = bird_mask_bool_from_fg_path(
+                                    w0, h0, fg_p, warn_prefix=desc
                                 )
                         elif args.match_fg_size:
                             bn = os.path.basename(fp)
@@ -640,19 +749,28 @@ def main() -> None:
                                     f"(tried hub + {fg_only_root!r}); using centered square.",
                                     file=sys.stderr,
                                 )
-                                im = mask_center_square_half_short_side(im)
+                                mask = center_half_square_mask_hw(w0, h0)
                             else:
-                                im = mask_square_from_fg_alignment(
-                                    im, fg_p, warn_prefix=desc
+                                mask = square_mask_from_fg_path(
+                                    w0, h0, fg_p, warn_prefix=desc
                                 )
                         elif args.gray_square:
-                            im = mask_center_square_half_short_side(im)
+                            mask = center_half_square_mask_hw(w0, h0)
+
+                        if mask is not None:
+                            im = fill_masked(
+                                im,
+                                mask,
+                                use_inpaint=args.inpaint,
+                                inpaint_radius=args.inpaint_radius,
+                            )
                         if not args.debug:
                             if (
                                 im.size == (tw, th)
                                 and not args.gray_square
                                 and not args.match_fg_size
                                 and not args.keep_mask_shape
+                                and not args.inpaint
                             ):
                                 total_skip_same += 1
                                 continue
@@ -672,15 +790,16 @@ def main() -> None:
     gs = ", --gray-square" if args.gray_square else ""
     mf = ", --match-fg-size" if args.match_fg_size else ""
     km = ", --keep-mask-shape" if args.keep_mask_shape else ""
+    ip = ", --inpaint" if args.inpaint else ""
     db = ", --debug" if args.debug else ""
     if args.debug:
         print(
-            f"Done (--targets={args.targets}{gs}{mf}{km}{db}). Wrote {total_changed} images "
+            f"Done (--targets={args.targets}{gs}{mf}{km}{ip}{db}). Wrote {total_changed} images "
             f"under ``*_debug`` subfolders (max 2 per label folder); not in-place."
         )
     else:
         print(
-            f"Done (--targets={args.targets}{gs}{mf}{km}). Resized {total_changed} files; "
+            f"Done (--targets={args.targets}{gs}{mf}{km}{ip}). Resized {total_changed} files; "
             f"skipped {total_skip_same} already {tw}x{th}."
         )
 

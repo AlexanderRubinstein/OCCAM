@@ -6,6 +6,24 @@
     "configurations": [
 
         {
+            "name": "Match Waterbirds BG-only to Full (SigLIP, exact pixel)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "scripts/match_waterbirds_bg_only_to_full_siglip.py",
+            "console": "integratedTerminal",
+            "python": "/weka/oh/arubinstein17/github/OCCAM/envs/occam0804/bin/python",
+            "justMyCode": true,
+            "args": [
+                "--waterbirds-root",
+                "data/datasets/Waterbirds",
+                "--output",
+                "data/datasets/Waterbirds/bg_only_to_full_siglip.json",
+                "--exact-pixel"
+            ]
+        },
+
+
+        {
             "name": "Eval Spurious: Urban Cars CLIP Cropformer",
             "type": "debugpy",
             "request": "launch",
