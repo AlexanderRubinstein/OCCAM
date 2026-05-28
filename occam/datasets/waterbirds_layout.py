@@ -12,8 +12,8 @@ Where ``<group>`` is one of:
   ``landbird_on_land``, ``landbird_on_water``, ``waterbird_on_land``, ``waterbird_on_water``.
 
 A minimal tree (e.g. older Hub snapshots) may contain only the first two variants per group
-(eight folders). Optional ``*_bg_only`` trees are populated from ``bg_only/test_split/group_*``
-via :func:`materialize_bg_only_subscenarios`.
+(eight folders). Optional ``*_bg_only`` trees are populated from ``metadata.csv`` and Places
+images (``place_filename``) via :func:`materialize_bg_only_subscenarios`.
 
 Legacy layout (Google Drive tar / older OCCAM checkouts):
 
@@ -305,25 +305,16 @@ def migrate_legacy_tar_extract_to_hub_layout(waterbirds_root: str) -> None:
 
 def materialize_bg_only_subscenarios(waterbirds_root: str) -> int:
     """
-    Copy ``bg_only/test_split/group_{0..3}/`` into top-level ``*_bg_only`` folders.
+    Sync ``*_bg_only`` from ``metadata.csv`` + Places image roots (see
+    ``occam.datasets.waterbirds_metadata.sync_bg_only_subscenarios_from_metadata``).
 
-    Idempotent: uses ``copytree(..., dirs_exist_ok=True)`` so re-runs merge/replace files
-    under existing class subfolders.
-
-    Returns the number of ``group_*`` source directories that were found and processed.
+    Returns the number of background files copied.
     """
-    aux = os.path.join(waterbirds_root, AUX_BG_ONLY_ROOT, "test_split")
-    if not os.path.isdir(aux):
-        return 0
-    n = 0
-    for gid in range(4):
-        src = os.path.join(aux, f"group_{gid}")
-        if not os.path.isdir(src):
-            continue
-        dst = path_background_only(waterbirds_root, gid)
-        shutil.copytree(src, dst, dirs_exist_ok=True)
-        n += 1
-    return n
+    from occam.datasets.waterbirds_metadata import (
+        materialize_bg_only_subscenarios as _sync,
+    )
+
+    return _sync(waterbirds_root)
 
 
 _IMAGE_EXT_CHECK = frozenset(
@@ -354,8 +345,8 @@ def assert_full_hub_subscenario_tree(waterbirds_root: str) -> None:
         if not os.path.isdir(p):
             raise FileNotFoundError(
                 f"Missing subscenario directory {name!r} under {waterbirds_root!r}. "
-                f"For ``*_bg_only`` folders, place images under {AUX_BG_ONLY_ROOT!r}/test_split/group_* "
-                f"or create the top-level folder manually."
+                "For ``*_bg_only`` folders, run metadata-driven sync "
+                "(``metadata.csv`` + Places image root)."
             )
         if not _subscenario_tree_has_image(p):
             raise FileNotFoundError(

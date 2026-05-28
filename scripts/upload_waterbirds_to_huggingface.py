@@ -41,10 +41,15 @@ from occam.datasets.waterbirds_layout import (
     assert_uploadable_waterbirds,
     assert_waterbirds_layout,
     detect_layout,
-    materialize_bg_only_subscenarios,
     migrate_legacy_tar_extract_to_hub_layout,
     migrate_split_layout_to_subscenarios,
     source_dir_for_subscenario,
+)
+from occam.datasets.waterbirds_metadata import (
+    METADATA_CSV_FILENAME,
+    default_metadata_path,
+    default_places_root,
+    sync_bg_only_subscenarios_from_metadata,
 )
 
 import waterbirds_hf_common
@@ -78,6 +83,46 @@ def _upload_dataset_loading_script(
         token=token,
         commit_message="Add datasets loading script (Subset = subscenario)",
     )
+
+
+def _upload_metadata_csv(
+    api, repo_id: str, token: Optional[str], metadata_path: str
+) -> None:
+    if not os.path.isfile(metadata_path):
+        raise FileNotFoundError(
+            f"Missing {METADATA_CSV_FILENAME!r} at {metadata_path!r} "
+            "(required to pair fg+bg and bg-only images)."
+        )
+    print(f"Uploading {METADATA_CSV_FILENAME!r} …")
+    api.upload_file(
+        path_or_fileobj=metadata_path,
+        path_in_repo=METADATA_CSV_FILENAME,
+        repo_id=repo_id,
+        repo_type="dataset",
+        token=token,
+        commit_message="Add metadata.csv (fg/bg pairing index)",
+    )
+
+
+def _sync_bg_only_from_metadata(wb: str, places_root: str) -> None:
+    stats = sync_bg_only_subscenarios_from_metadata(
+        wb,
+        metadata_path=default_metadata_path(wb),
+        places_root=places_root,
+        require_fg_exists=True,
+        prune=True,
+    )
+    print(
+        f"Synced ``*_bg_only`` from {METADATA_CSV_FILENAME!r}: "
+        f"{stats.copied} copied, {stats.pruned} pruned, "
+        f"{stats.missing_aux} missing Places backgrounds, "
+        f"{stats.missing_fg} rows without fg+bg on disk."
+    )
+    if stats.copied == 0:
+        raise SystemExit(
+            f"No background files copied. Ensure {METADATA_CSV_FILENAME!r} exists and "
+            f"``--places-root`` points to Places 256 images (e.g. {default_places_root()!r})."
+        )
 
 
 def _try_delete_remote_dataset_script(
@@ -198,9 +243,12 @@ and ``*_bg_only`` (background crop). Each triplet shares the **same spurious-cue
 {sub_rows_fg}
 {sub_rows_bg}
 
-Background-only crops are staged under ``bg_only/test_split/group_*`` locally and copied
-into ``*_bg_only`` by the OCCAM upload script (see ``materialize_bg_only_subscenarios`` in
-``occam/datasets/waterbirds_layout.py``).
+Background-only crops are paired with fg+bg composites via ``metadata.csv`` at the dataset
+root (``img_filename`` ↔ ``place_filename``; same basename under ``*_bg_only`` as under the
+matching fg+bg subscenario). The upload script copies pixels from Places 256
+(``data/dataset/places/data_256_standard`` by default, configurable via ``--places-root``)
+using ``place_filename`` (see ``sync_bg_only_subscenarios_from_metadata`` in
+``occam/datasets/waterbirds_metadata.py``).
 
 ### Class labels inside ``0/`` and ``1/``
 
@@ -242,6 +290,14 @@ No ``trust_remote_code`` is required (``datasets`` 4.x does not load Hub Python 
 If the viewer still shows a single **default** subset after updating the card, delete any stale
 auto-generated **`data/`** folder on the Hub **Files** tab (leftover from an older layout) and
 refresh the page.
+
+## ``metadata.csv``
+
+The repository includes **`metadata.csv`** at the root (WILDS-style columns:
+``img_id``, ``img_filename``, ``y``, ``split``, ``place``, ``place_filename``). Use it to recover
+the original bird image path and background Places path for each composite. Under each Hub
+subscenario, image files are named from ``img_filename``; the matching ``*_bg_only`` file uses
+the **same basename** so fg+bg and bg-only subsets stay aligned.
 
 ## OCCAM codebase
 
@@ -335,6 +391,14 @@ def main():
         "--token",
         default=None,
         help="Hugging Face access token (else env HF_TOKEN or cached login)",
+    )
+    parser.add_argument(
+        "--places-root",
+        default=default_places_root(),
+        help=(
+            "Root of Places 256 images used for bg-only synthesis from metadata place_filename "
+            "(default: data/dataset/places/data_256_standard)"
+        ),
     )
     parser.add_argument(
         "--private",
@@ -472,12 +536,7 @@ def main():
             )
             migrate_legacy_tar_extract_to_hub_layout(wb)
         migrate_split_layout_to_subscenarios(wb)
-        n_bg = materialize_bg_only_subscenarios(wb)
-        if n_bg:
-            print(
-                f"Materialized background-only subscenarios from ``bg_only/test_split/`` "
-                f"({n_bg} group trees copied to ``*_bg_only``)."
-            )
+        _sync_bg_only_from_metadata(wb, args.places_root)
         per = args.debug_per_group
         with tempfile.TemporaryDirectory(prefix="waterbirds_hf_debug_") as tmp:
             n, rels = build_debug_waterbirds_staging(wb, tmp, per_group=per)
@@ -506,6 +565,9 @@ def main():
                     repo_type="dataset",
                     commit_message=f"Debug subset: {sub}",
                 )
+        _upload_metadata_csv(
+            api, args.repo_id, args.token, default_metadata_path(wb)
+        )
     else:
         if detect_layout(wb) == "legacy":
             print(
@@ -515,13 +577,12 @@ def main():
             migrate_legacy_tar_extract_to_hub_layout(wb)
         migrate_split_layout_to_subscenarios(wb)
         assert_waterbirds_layout(wb)
-        n_bg = materialize_bg_only_subscenarios(wb)
-        if n_bg:
-            print(
-                f"Materialized background-only subscenarios from ``bg_only/test_split/`` "
-                f"({n_bg} group trees copied to ``*_bg_only``)."
-            )
+        _sync_bg_only_from_metadata(wb, args.places_root)
         assert_full_hub_subscenario_tree(wb)
+
+        _upload_metadata_csv(
+            api, args.repo_id, args.token, default_metadata_path(wb)
+        )
 
         patterns = [f"{name}/*" for name in REQUIRED_TOP_LEVEL]
         print(

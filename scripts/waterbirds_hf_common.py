@@ -57,10 +57,10 @@ def extract_waterbirds_from_uc_wb_ca_tar(
 
     The archive uses legacy paths (``test_split/group_*``, ``FG-Only/test_split/group_*``);
     this rewrites them in-place to eight core top-level subscenario folders (e.g.
-    ``landbird_on_land``, ``landbird_on_land_fg_only``, …). If the archive also contains
-    ``bg_only/test_split/group_*``, leave it in place; use
-    :func:`occam.datasets.waterbirds_layout.materialize_bg_only_subscenarios` to populate
-    ``*_bg_only`` folders before a full Hub upload.
+    ``landbird_on_land``, ``landbird_on_land_fg_only``, …). Pair ``*_bg_only`` to fg+bg
+    composites with ``metadata.csv`` via
+    ``occam.datasets.waterbirds_metadata.sync_bg_only_subscenarios_from_metadata`` before
+    a full Hub upload.
     """
     os.makedirs(dest_waterbirds_root, exist_ok=True)
     with tarfile.open(tar_path, "r:*") as tf:

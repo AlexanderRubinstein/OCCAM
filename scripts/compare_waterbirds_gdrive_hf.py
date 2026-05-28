@@ -132,7 +132,7 @@ def main():
             waterbirds_hf_common.assert_waterbirds_layout(hf_wb)
             gdrive_side, hf_side = gdrive_wb, hf_wb
 
-        ignore = {"README.md", ".gitattributes"}
+        ignore = {"README.md", ".gitattributes", "metadata.csv"}
         ok, msgs = waterbirds_hf_common.compare_waterbirds_trees(
             gdrive_side,
             hf_side,
