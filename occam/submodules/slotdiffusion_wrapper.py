@@ -17,7 +17,7 @@ import torch
 from PIL import Image
 from torch import nn
 from torch.nn import functional as F
-from transformers import ViTModel
+from transformers import ViTConfig, ViTModel
 
 from stuned.utility.utils import get_project_root_path
 
@@ -106,7 +106,14 @@ class DINOEncoder(nn.Module):
         self.resolution = resolution
         self.patch_size = patch_size
         version = "s" if small_size else "b"
-        self.dino = ViTModel.from_pretrained(f"facebook/dino-vit{version}{patch_size}")
+        # Build architecture only; weights are loaded from the SlotDiffusion
+        # checkpoint. Skip the pooler layer (unused by DINO feature extraction).
+        model_id = f"facebook/dino-vit{version}{patch_size}"
+        try:
+            config = ViTConfig.from_pretrained(model_id, local_files_only=True)
+        except OSError:
+            config = ViTConfig.from_pretrained(model_id)
+        self.dino = ViTModel(config, add_pooling_layer=False)
         for param in self.dino.parameters():
             param.requires_grad = False
 
@@ -305,16 +312,12 @@ def load_checkpoint(model: SlotDiffusionEncoder, checkpoint_path: str) -> SlotDi
     for key, value in checkpoint.items():
         if not key.startswith(ENCODER_PREFIXES):
             continue
-        if key.startswith("encoder.dino.pooler."):
-            continue
         remapped_key = _remap_dino_checkpoint_key(key)
         if remapped_key is None:
             continue
         state_dict[remapped_key] = value
 
-    missing, unexpected = model.load_state_dict(state_dict, strict=False)
-    allowed_missing = {"encoder.dino.pooler.dense.weight", "encoder.dino.pooler.dense.bias"}
-    missing = [key for key in missing if key not in allowed_missing]
+    missing, unexpected = model.load_state_dict(state_dict, strict=True)
     if unexpected:
         raise RuntimeError(
             f"Unexpected keys when loading SlotDiffusion checkpoint: {unexpected}"
@@ -325,9 +328,7 @@ def load_checkpoint(model: SlotDiffusionEncoder, checkpoint_path: str) -> SlotDi
     return model
 
 
-def build_model(pretrained_dino: bool = True) -> SlotDiffusionEncoder:
-    if not pretrained_dino:
-        raise ValueError("SlotDiffusion requires a DINO encoder; use pretrained_dino=True.")
+def build_model() -> SlotDiffusionEncoder:
     return SlotDiffusionEncoder()
 
 
