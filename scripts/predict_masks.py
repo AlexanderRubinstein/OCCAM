@@ -33,6 +33,16 @@ from stuned.utility.utils import (
 TAR_FOLDER = os.path.join(get_project_root_path(), "data", "tars")
 
 
+def resolve_project_path(path):
+    """Resolve repo-relative paths against the OCCAM project root."""
+    if path is None or path == "DEFAULT":
+        return None
+    path = os.path.expanduser(path)
+    if not os.path.isabs(path):
+        path = os.path.join(get_project_root_path(), path)
+    return os.path.normpath(path)
+
+
 def get_parser():
     parser = argparse.ArgumentParser(description="Predict masks with mask generators")
     parser.add_argument("--model_id", help="Dino-FT model id")
@@ -124,6 +134,17 @@ if __name__ == "__main__":
     predict masks with mask generators
     """
     args = get_parser().parse_args()
+
+    args.input_folder = resolve_project_path(args.input_folder)
+    args.output = resolve_project_path(args.output)
+    args.model_path = resolve_project_path(args.model_path)
+    args.config_file = resolve_project_path(args.config_file)
+
+    if not os.path.isdir(args.input_folder):
+        raise FileNotFoundError(
+            f"Input folder not found: {args.input_folder}. "
+            "Download datasets with scripts/download_datasets_and_checkpoints.py."
+        )
 
     optionally_make_dir(args.output)
 
