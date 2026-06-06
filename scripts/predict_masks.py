@@ -8,12 +8,14 @@ import torch
 from PIL import Image
 import numpy as np
 from ftdinosaur_inference import build_dinosaur
-from torchvision.datasets import ImageFolder
 
 
 # local imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from occam.submodules.dino_ft_wrapper import load_model, get_masks_as_image
+from occam.submodules.dino_ft_wrapper import (
+    load_model as load_dino_ft_model,
+    get_masks_as_image,
+)
 from occam.get_segments.run_cropformer import EntityNetV2
 from occam.datasets.utils import CustomImageFolder
 
@@ -34,7 +36,7 @@ TAR_FOLDER = os.path.join(get_project_root_path(), "data", "tars")
 def get_parser():
     parser = argparse.ArgumentParser(description="Predict masks with mask generators")
     parser.add_argument("--model_id", help="Dino-FT model id")
-    parser.add_argument("--model_path", help="Cropformer checkpoint path")
+    parser.add_argument("--model_path", help="Mask generator checkpoint path")
     parser.add_argument("--input_folder", help="Input folder")
     parser.add_argument("--num_slots", help="Number of slots", type=int)
     parser.add_argument("--output", help="Output file")
@@ -45,7 +47,7 @@ def get_parser():
         "--mask_generator_type",
         help="Mask generator type",
         type=str,
-        choices=["dino-ft", "cropformer"],
+        choices=["dino-ft", "dino-v1", "slotdiffusion", "cropformer"],
     )
     parser.add_argument(
         "--range", help="Range of images to process", default=None
@@ -70,9 +72,56 @@ def should_be_provided(arg, arg_name, mask_generator_type):
     ), f"{arg_name} should be provided for {mask_generator_type}"
 
 
+def get_slotdiffusion_mask_as_image(masks, height, width):
+    """Convert SlotDiffusion soft masks [1, K, H, W] to an image-sized hard mask."""
+    assert len(masks.shape) == 4, f"masks shape is {masks.shape}"
+    assert masks.shape[0] == 1, f"masks shape is {masks.shape}"
+    masks = torch.nn.functional.interpolate(
+        masks.float(),
+        size=(height, width),
+        mode="bilinear",
+        align_corners=False,
+    )
+    return masks.argmax(dim=1).squeeze(0)
+
+
+def predict_slot_masks(model, dataset, num_workers, masks_to_image_fn, model_forward_fn):
+    masks_to_pickle = {}
+
+    dl = DataLoader(
+        dataset,
+        batch_size=1,
+        shuffle=False,
+        num_workers=num_workers,
+    )
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+
+    for sample, _, image_path in tqdm(dl):
+        assert len(image_path) == 1
+
+        image_path = image_path[0]  # extract from tuple
+        image = Image.open(image_path)  # needed for height and width
+
+        with torch.no_grad():
+            inp = sample.to(device)
+            outp = model_forward_fn(model, inp)
+            masks_as_image = masks_to_image_fn(
+                outp["masks"], height=image.height, width=image.width
+            )
+            mask_id = image_path[1:]  # legacy
+            masks_to_pickle[mask_id] = {
+                "mask": masks_as_image.cpu().numpy().astype(np.uint8),
+            }
+
+    assert len(masks_to_pickle) == len(dl)
+    return masks_to_pickle
+
+
 if __name__ == "__main__":
     """
-    predict masks with Dino-FT or CropFormer
+    predict masks with mask generators
     """
     args = get_parser().parse_args()
 
@@ -135,42 +184,82 @@ if __name__ == "__main__":
             args.confidence_threshold is None
         ), "confidence_threshold is not implemented for dino-ft"
 
-        model = load_model(args.model_id)
+        model = load_dino_ft_model(args.model_id)
         preproc = build_dinosaur.build_preprocessing(args.model_id)
-
-        masks_to_pickle = {}
 
         dataset = CustomImageFolder(
             root=args.input_folder, return_path=True, transform=preproc
         )
 
-        dl = DataLoader(
+        masks_to_pickle = predict_slot_masks(
+            model,
             dataset,
-            batch_size=1,
-            shuffle=False,
-            num_workers=args.num_workers,
+            args.num_workers,
+            get_masks_as_image,
+            lambda cur_model, inp: cur_model(inp, num_slots=args.num_slots),
+        )
+        pickle.dump(masks_to_pickle, open(args.output, "wb"))
+
+    elif args.mask_generator_type == "dino-v1":
+        should_be_provided(args.model_path, "model_path", "dino-v1")
+        should_be_provided(args.num_slots, "num_slots", "dino-v1")
+
+        should_be_none(args.config_file, "config_file", "dino-v1")
+        should_be_none(args.model_id, "model_id", "dino-v1")
+        should_be_none(args.range, "range", "dino-v1")
+        should_be_none(
+            args.confidence_threshold, "confidence_threshold", "dino-v1"
         )
 
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        from occam.submodules.dino_basic_wrapper import (
+            build_preprocessing as build_dino_v1_preprocessing,
+            load_model as load_dino_v1_model,
+        )
 
-        model.to(device)
+        model = load_dino_v1_model(args.model_path)
+        preproc = build_dino_v1_preprocessing()
 
-        for sample, _, image_path in tqdm(dl):
-            assert len(image_path) == 1
+        dataset = CustomImageFolder(
+            root=args.input_folder, return_path=True, transform=preproc
+        )
 
-            image_path = image_path[0]  # extract from tuple
+        masks_to_pickle = predict_slot_masks(
+            model,
+            dataset,
+            args.num_workers,
+            get_masks_as_image,
+            lambda cur_model, inp: cur_model(inp, num_slots=args.num_slots),
+        )
+        pickle.dump(masks_to_pickle, open(args.output, "wb"))
 
-            image = Image.open(image_path)  # needed for height and width
+    elif args.mask_generator_type == "slotdiffusion":
+        should_be_provided(args.model_path, "model_path", "slotdiffusion")
 
-            with torch.no_grad():
-                inp = sample.to(device)
-                outp = model(inp, num_slots=args.num_slots)
-                masks_as_image = get_masks_as_image(
-                    outp["masks"], height=image.height, width=image.width
-                )
-                mask_id = image_path[1:]  # legacy
-                masks_to_pickle[mask_id] = {
-                    "mask": masks_as_image.cpu().numpy().astype(np.uint8),
-                }
-        assert len(masks_to_pickle) == len(dl)
+        should_be_none(args.config_file, "config_file", "slotdiffusion")
+        should_be_none(args.model_id, "model_id", "slotdiffusion")
+        should_be_none(args.num_slots, "num_slots", "slotdiffusion")
+        should_be_none(args.range, "range", "slotdiffusion")
+        should_be_none(
+            args.confidence_threshold, "confidence_threshold", "slotdiffusion"
+        )
+
+        from occam.submodules.slotdiffusion_wrapper import (
+            build_preprocessing as build_slotdiffusion_preprocessing,
+            load_model as load_slotdiffusion_model,
+        )
+
+        model = load_slotdiffusion_model(args.model_path)
+        preproc = build_slotdiffusion_preprocessing()
+
+        dataset = CustomImageFolder(
+            root=args.input_folder, return_path=True, transform=preproc
+        )
+
+        masks_to_pickle = predict_slot_masks(
+            model,
+            dataset,
+            args.num_workers,
+            get_slotdiffusion_mask_as_image,
+            lambda cur_model, inp: cur_model(inp),
+        )
         pickle.dump(masks_to_pickle, open(args.output, "wb"))
