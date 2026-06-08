@@ -77,7 +77,7 @@ def get_parser():
         "--mask_source",
         default="cropformer",
         help="mask source",
-        choices=["cropformer", "dino_ft"],
+        choices=["cropformer", "dino_ft", "dino_v1", "slotdiffusion"],
     )
     parser.add_argument(
         "--ens_entropy",
