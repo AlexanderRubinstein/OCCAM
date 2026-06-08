@@ -1,6 +1,8 @@
 import os
 import sys
 import shutil
+from typing import Optional, Set
+
 from tqdm import tqdm
 import argparse
 
@@ -53,6 +55,60 @@ OOD_RESULTS_URL = (
 )
 BBOXES_URL = "https://drive.google.com/uc?id=1mcH4bximxJ0cEz44PhgNarwlrLMr0_6A"
 
+DATASET_SELECTIONS = frozenset(
+    {
+        "urban_cars",
+        "waterbirds",
+        "counter_animals",
+        "imagenet_val",
+        "imagenet_d",
+        "imagenet_9",
+        "bboxes",
+    }
+)
+CHECKPOINT_SELECTIONS = frozenset(
+    {
+        "cropformer",
+        "alpha_clip",
+        "ood_results",
+    }
+)
+ALL_SELECTIONS = DATASET_SELECTIONS | CHECKPOINT_SELECTIONS
+
+_SELECT_ALIASES = {
+    "urbancars": "urban_cars",
+    "urban-cars": "urban_cars",
+    "wb": "waterbirds",
+    "counteranimals": "counter_animals",
+    "counter-animals": "counter_animals",
+    "imagenet-val": "imagenet_val",
+    "imagenet-d": "imagenet_d",
+    "imagenet-9": "imagenet_9",
+    "alphaclip": "alpha_clip",
+    "alpha-clip": "alpha_clip",
+    "ood": "ood_results",
+}
+
+
+def _want(name: str, selected: Optional[Set[str]]) -> bool:
+    return selected is None or name in selected
+
+
+def normalize_select(names: Optional[list[str]]) -> Optional[Set[str]]:
+    """Return ``None`` for download-all, else a validated set of selection keys."""
+    if not names:
+        return None
+    out: Set[str] = set()
+    for raw in names:
+        key = _SELECT_ALIASES.get(raw.lower(), raw.lower())
+        if key not in ALL_SELECTIONS:
+            raise SystemExit(
+                f"Unknown --select value {raw!r}. "
+                f"Choose from: {', '.join(sorted(ALL_SELECTIONS))}"
+            )
+        out.add(key)
+    return out
+
 
 def _ensure_waterbirds_from_huggingface(
     datasets_folder, hf_repo_id=None, hf_token=None
@@ -79,14 +135,21 @@ def download_datasets(
     ignore_image_net_val,
     waterbirds_hf_repo=None,
     waterbirds_hf_token=None,
+    selected: Optional[Set[str]] = None,
 ):
     """
     download datasets
     datasets_folder: path to the datasets folder
     ignore_image_net_val: if True, ignore ImageNet-val
+    selected: if set, only download these dataset keys (see DATASET_SELECTIONS)
     """
-    # UrbanCars, Waterbirds, CounterAnimals
-    if not os.path.exists(os.path.join(datasets_folder, "UrbanCars")):
+    # UrbanCars + CounterAnimals (and legacy Waterbirds) from shared Google Drive tar
+    want_uc_bundle = _want("urban_cars", selected) or _want(
+        "counter_animals", selected
+    )
+    if want_uc_bundle and not os.path.exists(
+        os.path.join(datasets_folder, "UrbanCars")
+    ):
         assert not os.path.exists(
             os.path.join(datasets_folder, "Waterbirds")
         ), "Waterbirds already exists while UrbanCars is missing, please delete Waterbirds and try again"
@@ -98,23 +161,29 @@ def download_datasets(
         )
         download_and_extract_tar(DATA_PATH, UC_WB_CA_URL, extension=".tar")
         wb_tar = os.path.join(datasets_folder, "Waterbirds")
-        if os.path.isdir(wb_tar):
+        if os.path.isdir(wb_tar) and _want("waterbirds", selected):
             print(
                 "Removing Waterbirds from the Google Drive bundle; "
                 "replacing with Hugging Face snapshot"
             )
             remove_file_or_folder(wb_tar)
+        elif os.path.isdir(wb_tar) and not _want("waterbirds", selected):
+            print(
+                "Removing Waterbirds from the Google Drive bundle "
+                "(not requested via --select)"
+            )
+            remove_file_or_folder(wb_tar)
 
-    _ensure_waterbirds_from_huggingface(
-        datasets_folder,
-        hf_repo_id=waterbirds_hf_repo,
-        hf_token=waterbirds_hf_token,
-    )
+    if _want("waterbirds", selected):
+        _ensure_waterbirds_from_huggingface(
+            datasets_folder,
+            hf_repo_id=waterbirds_hf_repo,
+            hf_token=waterbirds_hf_token,
+        )
 
-    if not ignore_image_net_val:
-        # ImageNet validation
+    if _want("imagenet_val", selected) and not ignore_image_net_val:
         imagenet_val_folder = os.path.join(datasets_folder, "ImageNet-val")
-        if not os.path.exists(os.path.join(imagenet_val_folder)):
+        if not os.path.exists(imagenet_val_folder):
             raise ValueError(
                 f"ImageNet-val folder does not exist in {imagenet_val_folder}. "
                 f"Please manually download it from e.g. {IMAGENET_VAL_KAGGLE_URL}. "
@@ -122,83 +191,90 @@ def download_datasets(
                 f"e.g. `ln -s <path_to_imagenet_val_folder> {imagenet_val_folder}`."
             )
 
-    # ImageNet-D
-    imagenet_d_folder = os.path.join(datasets_folder, "ImageNet-D")
-    if not os.path.exists(os.path.join(imagenet_d_folder, "background")):
-        print("Downloading ImageNet-D")
-        download_and_extract_tar(
-            datasets_folder, IMAGENET_D_URL, extension=".tar"
-        )
-        for subset in ["material", "questions", "texture"]:
-            remove_file_or_folder(os.path.join(imagenet_d_folder, subset))
+    if _want("imagenet_d", selected):
+        imagenet_d_folder = os.path.join(datasets_folder, "ImageNet-D")
+        if not os.path.exists(os.path.join(imagenet_d_folder, "background")):
+            print("Downloading ImageNet-D")
+            download_and_extract_tar(
+                datasets_folder, IMAGENET_D_URL, extension=".tar"
+            )
+            for subset in ["material", "questions", "texture"]:
+                remove_file_or_folder(os.path.join(imagenet_d_folder, subset))
 
-    # ImageNet-9 - 4.83GB
-    imagenet_9_folder = os.path.join(datasets_folder, "ImageNet-9")
-    if not os.path.exists(os.path.join(imagenet_9_folder, "mixed_rand")):
-        print("Downloading ImageNet-9")
-        download_and_extract_tar(
-            datasets_folder, IMAGENET_9_URL, extension=".tar"
-        )
-        shutil.move(
-            os.path.join(datasets_folder, "bg_challenge"),
-            os.path.join(imagenet_9_folder),
-        )
-        for subset in tqdm(os.listdir(imagenet_9_folder)):
-            print("Removing unused subsets of ImageNet-9")
-            if subset != "mixed_rand":
-                remove_file_or_folder(os.path.join(imagenet_9_folder, subset))
+    if _want("imagenet_9", selected):
+        imagenet_9_folder = os.path.join(datasets_folder, "ImageNet-9")
+        if not os.path.exists(os.path.join(imagenet_9_folder, "mixed_rand")):
+            print("Downloading ImageNet-9")
+            download_and_extract_tar(
+                datasets_folder, IMAGENET_9_URL, extension=".tar"
+            )
+            shutil.move(
+                os.path.join(datasets_folder, "bg_challenge"),
+                os.path.join(imagenet_9_folder),
+            )
+            for subset in tqdm(os.listdir(imagenet_9_folder)):
+                print("Removing unused subsets of ImageNet-9")
+                if subset != "mixed_rand":
+                    remove_file_or_folder(
+                        os.path.join(imagenet_9_folder, subset)
+                    )
 
-    # bboxes for OOD detection
-    annotations_path = os.path.join(DATA_PATH, "bboxes_annotations")
-    if not os.path.exists(os.path.join(annotations_path, "val")):
-        print(
-            "Downloading ground truth bboxes for OOD detection on ImageNet-val"
-        )
-        download_and_extract_tar(DATA_PATH, BBOXES_URL, extension=".tar")
+    if _want("bboxes", selected):
+        annotations_path = os.path.join(DATA_PATH, "bboxes_annotations")
+        if not os.path.exists(os.path.join(annotations_path, "val")):
+            print(
+                "Downloading ground truth bboxes for OOD detection on ImageNet-val"
+            )
+            download_and_extract_tar(DATA_PATH, BBOXES_URL, extension=".tar")
 
-    print("All datasets downloaded!")
+    print("Dataset download step finished.")
 
 
-def download_checkpoints(checkpoints_folder):
+def download_checkpoints(
+    checkpoints_folder, selected: Optional[Set[str]] = None
+):
     """
     download checkpoints
     checkpoints_folder: path to the checkpoints folder
+    selected: if set, only download these checkpoint keys (see CHECKPOINT_SELECTIONS)
     """
     optionally_make_dir(checkpoints_folder, call_dirname=False)
 
-    # Cropformer
-    cropformer_checkpoint_path = os.path.join(
-        CHECKPOINTS_FOLDER, "CropFormer_hornet_3x_03823a.pth"
-    )
-    if not os.path.exists(cropformer_checkpoint_path):
-        print(
-            f"Downloading Cropformer checkpoint to {cropformer_checkpoint_path}"
+    if _want("cropformer", selected):
+        cropformer_checkpoint_path = os.path.join(
+            CHECKPOINTS_FOLDER, "CropFormer_hornet_3x_03823a.pth"
         )
-        download_file(cropformer_checkpoint_path, CROPFORMER_CHECKPOINT_URL)
+        if not os.path.exists(cropformer_checkpoint_path):
+            print(
+                f"Downloading Cropformer checkpoint to {cropformer_checkpoint_path}"
+            )
+            download_file(cropformer_checkpoint_path, CROPFORMER_CHECKPOINT_URL)
 
-    # AlphaClip
-    alpha_clip_checkpoint_path = os.path.join(
-        CHECKPOINTS_FOLDER, "clip_l14_grit20m_fultune_2xe.pth"
-    )
-    if not os.path.exists(alpha_clip_checkpoint_path):
-        print(
-            f"Downloading AlphaClip checkpoint to {alpha_clip_checkpoint_path}"
+    if _want("alpha_clip", selected):
+        alpha_clip_checkpoint_path = os.path.join(
+            CHECKPOINTS_FOLDER, "clip_l14_grit20m_fultune_2xe.pth"
         )
-        download_file(alpha_clip_checkpoint_path, ALPHA_CLIP_CHECKPOINT_URL)
+        if not os.path.exists(alpha_clip_checkpoint_path):
+            print(
+                f"Downloading AlphaClip checkpoint to {alpha_clip_checkpoint_path}"
+            )
+            download_file(alpha_clip_checkpoint_path, ALPHA_CLIP_CHECKPOINT_URL)
 
-    # results for OOD detection
-    results_path = os.path.join(DATA_PATH, "results")
-    if not os.path.exists(os.path.join(results_path, "ood_detection")):
-        assert not os.path.exists(
-            os.path.join(results_path, "uncertainty_scores")
-        ), (
-            "OOD detection results already exist while uncertainty scores are missing, "
-            "please delete OOD detection results and try again"
-        )
-        print("Downloading results checkpoints for OOD detection")
-        download_and_extract_tar(DATA_PATH, OOD_RESULTS_URL, extension=".tar")
+    if _want("ood_results", selected):
+        results_path = os.path.join(DATA_PATH, "results")
+        if not os.path.exists(os.path.join(results_path, "ood_detection")):
+            assert not os.path.exists(
+                os.path.join(results_path, "uncertainty_scores")
+            ), (
+                "OOD detection results already exist while uncertainty scores are missing, "
+                "please delete OOD detection results and try again"
+            )
+            print("Downloading results checkpoints for OOD detection")
+            download_and_extract_tar(
+                DATA_PATH, OOD_RESULTS_URL, extension=".tar"
+            )
 
-    print("All checkpoints are downloaded!")
+    print("Checkpoint download step finished.")
 
 
 def main():
@@ -221,15 +297,33 @@ def main():
         default=None,
         help="HF token for private datasets (default: huggingface-cli login / HF_TOKEN env)",
     )
+    parser.add_argument(
+        "--select",
+        nargs="+",
+        default=None,
+        metavar="NAME",
+        help=(
+            "Download only the named datasets/checkpoints (default: all). "
+            f"Datasets: {', '.join(sorted(DATASET_SELECTIONS))}. "
+            f"Checkpoints: {', '.join(sorted(CHECKPOINT_SELECTIONS))}. "
+            "Aliases: wb, urbancars, counteranimals, imagenet-val, imagenet-d, "
+            "imagenet-9, alphaclip, ood."
+        ),
+    )
     args = parser.parse_args()
 
-    download_datasets(
-        DATASETS_FOLDER,
-        args.ignore_image_net_val,
-        waterbirds_hf_repo=args.waterbirds_hf_repo,
-        waterbirds_hf_token=args.waterbirds_hf_token,
-    )
-    download_checkpoints(CHECKPOINTS_FOLDER)
+    selected = normalize_select(args.select)
+
+    if selected is None or selected & DATASET_SELECTIONS:
+        download_datasets(
+            DATASETS_FOLDER,
+            args.ignore_image_net_val,
+            waterbirds_hf_repo=args.waterbirds_hf_repo,
+            waterbirds_hf_token=args.waterbirds_hf_token,
+            selected=selected,
+        )
+    if selected is None or selected & CHECKPOINT_SELECTIONS:
+        download_checkpoints(CHECKPOINTS_FOLDER, selected=selected)
 
 
 if __name__ == "__main__":
