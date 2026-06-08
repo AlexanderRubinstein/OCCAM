@@ -25,7 +25,7 @@ from stuned.local_datasets.transforms import (
 
 # local modules
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath("")), "src"))
-from occam.datasets.utils import open_pil_image, subpath, load_xml
+from occam.datasets.utils import open_pil_image, open_pil_image_uint8, subpath, load_xml
 from occam.robust_classification.masking import (
     DEFAULT_VISUAL_PROMPT_TYPE,
     apply_visual_prompts,
@@ -478,15 +478,7 @@ def get_return_tuple(
     if apply_mask:
         image = open_pil_image(source_image_path)
     else:
-        # imoprt here, because detectron2 is not installed by default
-        from detectron2.data.detection_utils import read_image
-
-        image = read_image(
-            source_image_path, format="BGR"
-        )  # https://github.com/facebookresearch/detectron2/blob/c69939aa85460e8135f40bce908a6cddaa73065f/detectron2/data/detection_utils.py#L166
-        image = image[:, :, ::-1]
-        image = np.copy(image)  # to avoid warnings about non-writeable arrays
-        # image = image / 255 # uint8 -> float32
+        image = open_pil_image_uint8(source_image_path)
 
     if bbox_path is None or (
         not isinstance(bbox_path, str) and np.isnan(bbox_path)
@@ -508,8 +500,7 @@ def get_return_tuple(
                 image.shape[0] == bbox.shape[1]
                 and image.shape[1] == bbox.shape[0]
             ):
-                # sometimes read_image from detectron2 rotates image to surpass pillow bug
-                # see "_apply_exif_orientation" here: https://detectron2.readthedocs.io/en/latest/_modules/detectron2/data/detection_utils.html
+                # EXIF orientation can swap width/height relative to stored bbox masks
                 image = image.transpose(1, 0, 2)
             else:
                 if allow_bbox_shape_mismatch:

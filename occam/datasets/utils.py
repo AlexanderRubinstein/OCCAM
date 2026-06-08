@@ -3,7 +3,7 @@ import os
 import torch
 import wandb
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 from typing import Any
 from torchvision.datasets import ImageFolder
 import torchvision
@@ -42,6 +42,13 @@ def open_pil_image(image_path):
         np.array(Image.open(image_path).convert("RGB"))
         / IMAGE_NORMALIZATION_CONST
     )
+
+
+def open_pil_image_uint8(image_path):
+    """Load image as uint8 RGB with EXIF orientation applied."""
+    with Image.open(image_path) as img:
+        img = ImageOps.exif_transpose(img)
+        return np.array(img.convert("RGB"), copy=True)
 
 
 def make_wandb_image(tensor, caption=None):
