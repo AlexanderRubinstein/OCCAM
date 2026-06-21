@@ -22,12 +22,23 @@ from stuned.utility.utils import (
 
 NUM_LAST_LINES_IN_STDOUT = 100000
 MAX_COL_WIDTH = 1000
+MISSING_RESULT = "??"
 ALPHA_CHANNEL = "$\\alpha$-channel"
 ALPHA_ONE = "($\\alpha$ = 1)"
 ALPHA_CLIP = "alpha_clip_ViT-L/14"
 CLIP = "clip_openai_ViT-L/14"
 SIGLIP = "clip_openclip_webli_ViT-B-16-SigLIP-384"
 CLIP_RN50 = "clip_openai_RN50"
+MASK_SOURCE_DISPLAY_NAMES = {
+    "dino_v1": "dino-v1",
+}
+MASK_SOURCES_WITH_MASKS = {
+    "cropformer",
+    "dino_ft",
+    "dino-v1",
+    "slotdiffusion",
+}
+MASK_SOURCE_TABLE_ORDER = ["dino_ft", "dino-v1", "slotdiffusion", "cropformer"]
 
 
 def get_parser():
@@ -65,6 +76,19 @@ def format_number(x):
         return x
     else:
         return format_percentage(x)
+
+
+def is_missing_value(x):
+    return pd.isna(x) or x in ["", "?"]
+
+
+def format_mask_source(mask_source):
+    return MASK_SOURCE_DISPLAY_NAMES.get(mask_source, mask_source)
+
+
+def warn(warnings, message):
+    warnings.append(message)
+    print(f"WARNING: {message}")
 
 
 def parse_results_line(line, dataset_name):
@@ -145,15 +169,49 @@ def main():
     csv = pd.read_csv(args.csv_with_results)
     results_df = None
     result_rows = []
+    warnings = []
     for i, row in csv.iterrows():
         # skip empty rows
-        if not np.any(row):
+        required_cols = [
+            "delta:kwargs/dataset_name",
+            "delta:kwargs/mask_source",
+            "run_folder",
+        ]
+        if all(is_missing_value(row.get(col)) for col in required_cols):
             continue
         dataset_name = get_with_assert(row, "delta:kwargs/dataset_name")
-        mask_source = get_with_assert(row, "delta:kwargs/mask_source")
+        mask_source = format_mask_source(
+            get_with_assert(row, "delta:kwargs/mask_source")
+        )
         run_folder = get_with_assert(row, "run_folder")
 
+        if is_missing_value(dataset_name) or is_missing_value(mask_source):
+            warn(
+                warnings,
+                f"Skipping row {i} of sheet {args.csv_with_results}: "
+                "missing dataset_name or mask_source.",
+            )
+            continue
+
+        if is_missing_value(run_folder):
+            warn(
+                warnings,
+                f"Experiment in row {i} of sheet {args.csv_with_results} "
+                f"({dataset_name}, {mask_source}) has no run folder. "
+                f"Using {MISSING_RESULT} in tables.",
+            )
+            continue
+
         stdout_path = os.path.join(run_folder, "stdout.txt")
+        if not os.path.exists(stdout_path):
+            warn(
+                warnings,
+                f"Experiment in row {i} of sheet {args.csv_with_results} "
+                f"({dataset_name}, {mask_source}) has no stdout at "
+                f"{stdout_path}. Using {MISSING_RESULT} in tables.",
+            )
+            continue
+
         with open(stdout_path, "r") as f:
             f.seek(0, os.SEEK_END)
             f.seek(
@@ -161,6 +219,7 @@ def main():
             )  # Read last chars
             stdout = f.read()
         last_lines = stdout.split("\n")
+        cur_result_rows = []
         for line in last_lines:
             line = line.replace("clean_", "")  # remove for CounterAnimal clean
             line = line.split("(log): ")[
@@ -191,19 +250,13 @@ def main():
 
                 mask_method = None
                 if arch == "CLIP":
-                    if (
-                        cur_mask_source == "cropformer"
-                        or cur_mask_source == "dino_ft"
-                    ):
+                    if cur_mask_source in MASK_SOURCES_WITH_MASKS:
                         mask_method = "Gray BG + Crop"
                     else:
                         assert cur_mask_source == "-"
                         mask_method = "-"
                 elif arch == "AlphaCLIP":
-                    if (
-                        cur_mask_source == "cropformer"
-                        or cur_mask_source == "dino_ft"
-                    ):
+                    if cur_mask_source in MASK_SOURCES_WITH_MASKS:
                         mask_method = ALPHA_CHANNEL
                     else:
                         assert cur_mask_source == "-"
@@ -225,17 +278,21 @@ def main():
                     "mask_source": cur_mask_source,
                 }
 
-                result_rows.append(result_row)
+                cur_result_rows.append(result_row)
 
         exp_finished = False
         if len(last_lines) > 1:
             exp_finished = "Logger context cleaned!" in last_lines[-2]
 
         if not exp_finished:
-            print(
-                f"Experiment in row {i} of sheet {args.csv_with_results} not finished!"
+            warn(
+                warnings,
+                f"Experiment in row {i} of sheet {args.csv_with_results} "
+                f"({dataset_name}, {mask_source}) is not finished. "
+                f"Using {MISSING_RESULT} in tables.",
             )
             continue
+        result_rows.extend(cur_result_rows)
 
     for result_row in result_rows:
         cur_row = copy.deepcopy(result_row)
@@ -249,13 +306,17 @@ def main():
 
     # flatten diagonal to horizontal
     groupby_cols = ["arch", "mask_source", "mask_method", "fg_score", "model"]
+    if results_df is None:
+        results_df = pd.DataFrame(columns=groupby_cols)
+
     dataset_cols = {
         col for col in results_df.columns if col not in groupby_cols
     }
 
-    results_df = results_df.groupby(groupby_cols, as_index=False).agg(
-        {**{col: single_non_nan for col in dataset_cols}}
-    )
+    if len(results_df) > 0:
+        results_df = results_df.groupby(groupby_cols, as_index=False).agg(
+            {**{col: single_non_nan for col in dataset_cols}}
+        )
 
     table_2a = make_table_2(results_df, "a")
     table_2b = make_table_2(results_df, "b")
@@ -270,6 +331,13 @@ def main():
     )  # to see long model names
 
     optionally_make_dir(args.result_folder, call_dirname=False)
+
+    warnings_path = os.path.join(args.result_folder, "warnings.txt")
+    with open(warnings_path, "w") as f:
+        if warnings:
+            f.write("\n".join(warnings) + "\n")
+        else:
+            f.write("No warnings.\n")
 
     table_2a.to_csv(
         os.path.join(args.result_folder, "Table_2a.csv"), index=False
@@ -302,10 +370,23 @@ def filter_table_by_ordered_rows(results_df, ordered_rows, col_names):
         row = results_df
         for key, value in zip(col_names, ordered_row):
             row = row[row[key] == value]
+        if len(row) == 0:
+            row = pd.DataFrame(
+                [{key: value for key, value in zip(col_names, ordered_row)}]
+            )
         if table is None:
             table = row
         else:
             table = pd.concat([table, row], ignore_index=True)
+    return table
+
+
+def ensure_columns(table, cols, fill_value=MISSING_RESULT):
+    for col in cols:
+        if col not in table.columns:
+            table[col] = fill_value
+        else:
+            table[col] = table[col].fillna(fill_value)
     return table
 
 
@@ -324,14 +405,15 @@ def make_table_2(results_df, section):
     ]
     if section == "a":
         cols_order += ["imagenet_d"]
-        ordered_rows = [
-            ["AlphaCLIP", ALPHA_ONE, "-", "-", ALPHA_CLIP],
-            ["CLIP", "Gray BG + Crop", "dino_ft", "oracle", CLIP],
-            ["CLIP", "Gray BG + Crop", "cropformer", "oracle", CLIP],
-            #
-            ["CLIP", "-", "-", "-", SIGLIP],
-            ["CLIP", "Gray BG + Crop", "dino_ft", "oracle", SIGLIP],
-            ["CLIP", "Gray BG + Crop", "cropformer", "oracle", SIGLIP],
+        ordered_rows = [["AlphaCLIP", ALPHA_ONE, "-", "-", ALPHA_CLIP]]
+        ordered_rows += [
+            ["CLIP", "Gray BG + Crop", mask_source, "oracle", CLIP]
+            for mask_source in MASK_SOURCE_TABLE_ORDER
+        ]
+        ordered_rows += [["CLIP", "-", "-", "-", SIGLIP]]
+        ordered_rows += [
+            ["CLIP", "Gray BG + Crop", mask_source, "oracle", SIGLIP]
+            for mask_source in MASK_SOURCE_TABLE_ORDER
         ]
     elif section in ["b", "c", "d"]:
         if section == "b":
@@ -340,20 +422,22 @@ def make_table_2(results_df, section):
             cols_order += ["imagenet_9"]
         elif section == "d":
             cols_order += ["waterbirds"]
-        ordered_rows = [
-            ["CLIP", "-", "-", "-", CLIP],
-            ["CLIP", "Gray BG + Crop", "dino_ft", "oracle", CLIP],
-            ["CLIP", "Gray BG + Crop", "cropformer", "oracle", CLIP],
-            #
-            ["CLIP", "-", "-", "-", CLIP_RN50],
-            ["CLIP", "Gray BG + Crop", "dino_ft", "oracle", CLIP_RN50],
-            ["CLIP", "Gray BG + Crop", "cropformer", "oracle", CLIP_RN50],
+        ordered_rows = [["CLIP", "-", "-", "-", CLIP]]
+        ordered_rows += [
+            ["CLIP", "Gray BG + Crop", mask_source, "oracle", CLIP]
+            for mask_source in MASK_SOURCE_TABLE_ORDER
+        ]
+        ordered_rows += [["CLIP", "-", "-", "-", CLIP_RN50]]
+        ordered_rows += [
+            ["CLIP", "Gray BG + Crop", mask_source, "oracle", CLIP_RN50]
+            for mask_source in MASK_SOURCE_TABLE_ORDER
         ]
     else:
         raise NotImplementedError(f"Section {section} not implemented")
 
     table = filter_table_by_ordered_rows(results_df, ordered_rows, col_names)
 
+    table = ensure_columns(table, cols_order)
     table = table[cols_order]
 
     table = table.map(format_number)
@@ -375,19 +459,21 @@ def make_table_3(results_df):
         "Cmn/Ctr",
         "Cmn - Ctr",
     ]
-    ordered_rows = [
-        ["AlphaCLIP", ALPHA_ONE, "-", "-", ALPHA_CLIP],
-        ["AlphaCLIP", ALPHA_CHANNEL, "dino_ft", "oracle", ALPHA_CLIP],
-        ["AlphaCLIP", ALPHA_CHANNEL, "cropformer", "oracle", ALPHA_CLIP],
+    ordered_rows = [["AlphaCLIP", ALPHA_ONE, "-", "-", ALPHA_CLIP]]
+    ordered_rows += [
+        ["AlphaCLIP", ALPHA_CHANNEL, mask_source, "oracle", ALPHA_CLIP]
+        for mask_source in MASK_SOURCE_TABLE_ORDER
     ]
     table = filter_table_by_ordered_rows(results_df, ordered_rows, col_names)
+    table = ensure_columns(table, ["common", "counter"])
     add_delta_column(table, name="Cmn - Ctr")
     table["Cmn/Ctr"] = table.apply(
         lambda row: f"{format_percentage(row['common'])}/{format_percentage(row['counter'])}"
-        if row["common"] != "-" and row["counter"] != "-"
-        else "-",
+        if is_number(row["common"]) and is_number(row["counter"])
+        else MISSING_RESULT,
         axis=1,
     )
+    table = ensure_columns(table, cols_order)
     table = table[cols_order]
     table = table.map(format_number)
     return table
@@ -399,25 +485,31 @@ def make_table_4(results_df):
     results_df: results dataframe
     """
     col_names = ["arch", "mask_method", "mask_source", "fg_score", "model"]
-    ordered_rows = [
-        ["CLIP", "-", "-", "-", CLIP],
-        #
-        ["CLIP", "Gray BG + Crop", "dino_ft", "ens_entropy", CLIP],
-        ["CLIP", "Gray BG + Crop", "dino_ft", "oracle", CLIP],
-        #
-        ["CLIP", "Gray BG + Crop", "cropformer", "ens_entropy", CLIP],
-        ["CLIP", "Gray BG + Crop", "cropformer", "oracle", CLIP],
-        #
-        ["AlphaCLIP", ALPHA_ONE, "-", "-", ALPHA_CLIP],
-        #
-        ["AlphaCLIP", ALPHA_CHANNEL, "dino_ft", "ens_entropy", ALPHA_CLIP],
-        ["AlphaCLIP", ALPHA_CHANNEL, "dino_ft", "oracle", ALPHA_CLIP],
-        #
-        ["AlphaCLIP", ALPHA_CHANNEL, "cropformer", "ens_entropy", ALPHA_CLIP],
-        ["AlphaCLIP", ALPHA_CHANNEL, "cropformer", "oracle", ALPHA_CLIP],
+    ordered_rows = [["CLIP", "-", "-", "-", CLIP]]
+    ordered_rows += [
+        ["CLIP", "Gray BG + Crop", mask_source, fg_score, CLIP]
+        for mask_source in MASK_SOURCE_TABLE_ORDER
+        for fg_score in ["ens_entropy", "oracle"]
+    ]
+    ordered_rows += [["AlphaCLIP", ALPHA_ONE, "-", "-", ALPHA_CLIP]]
+    ordered_rows += [
+        ["AlphaCLIP", ALPHA_CHANNEL, mask_source, fg_score, ALPHA_CLIP]
+        for mask_source in MASK_SOURCE_TABLE_ORDER
+        for fg_score in ["ens_entropy", "oracle"]
     ]
 
     table = filter_table_by_ordered_rows(results_df, ordered_rows, col_names)
+    table = ensure_columns(
+        table,
+        [
+            "waterbirds",
+            "imagenet_9",
+            "imagenet_d",
+            "urban_cars",
+            "common",
+            "counter",
+        ],
+    )
 
     # Add delta column with difference between common and counter
     add_delta_column(table)
@@ -433,6 +525,7 @@ def make_table_4(results_df):
         "urban_cars",
         "delta",
     ]
+    table = ensure_columns(table, cols_order)
     table = table[cols_order]
 
     table = table.map(format_number)
@@ -454,16 +547,17 @@ def make_table_5(results_df):
         "waterbirds",
     ]
 
-    ordered_rows = [
-        ["CLIP", "-", "-", "-", CLIP],
-        ["CLIP", "Gray BG + Crop", "cropformer", "max_prob", CLIP],
-        ["CLIP", "Gray BG + Crop", "cropformer", "ens_entropy", CLIP],
-        ["CLIP", "Gray BG + Crop", "cropformer", "oracle", CLIP],
-        ["CLIP", "-", "-", "only_fg", CLIP],
+    ordered_rows = [["CLIP", "-", "-", "-", CLIP]]
+    ordered_rows += [
+        ["CLIP", "Gray BG + Crop", mask_source, fg_score, CLIP]
+        for mask_source in MASK_SOURCE_TABLE_ORDER
+        for fg_score in ["max_prob", "ens_entropy", "oracle"]
     ]
+    ordered_rows += [["CLIP", "-", "-", "only_fg", CLIP]]
 
     table = filter_table_by_ordered_rows(results_df, ordered_rows, col_names)
 
+    table = ensure_columns(table, cols_order)
     table = table[cols_order]
 
     table = table.map(format_number)
@@ -479,8 +573,8 @@ def add_delta_column(table, name="delta"):
     """
     table[name] = table.apply(
         lambda row: float(row["common"]) - float(row["counter"])
-        if row["common"] != "-" and row["counter"] != "-"
-        else "-",
+        if is_number(row["common"]) and is_number(row["counter"])
+        else MISSING_RESULT,
         axis=1,
     )
 
@@ -494,7 +588,7 @@ def single_non_nan(x):
     if len(non_nan) == 1:
         return non_nan.iloc[0]
     elif len(non_nan) == 0:
-        return "-"
+        return MISSING_RESULT
     else:
         assert all(
             non_nan == non_nan.iloc[0]
